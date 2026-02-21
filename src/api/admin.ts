@@ -77,6 +77,42 @@ export interface AdminPermissionCatalogItem {
   permission: string
 }
 
+export interface AdminWalletAccount {
+  id: number
+  user_id: number
+  balance: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminWalletTransaction {
+  id: number
+  user_id: number
+  order_id?: number | null
+  type: string
+  direction: string
+  amount: string
+  balance_before: string
+  balance_after: string
+  currency: string
+  reference: string
+  remark: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminAdjustWalletPayload {
+  amount: string
+  operation?: 'add' | 'subtract'
+  currency?: string
+  remark?: string
+}
+
+export interface AdminRefundToWalletPayload {
+  amount: string
+  remark?: string
+}
+
 export const adminAPI = {
   login: (data: AdminLoginRequest) => api.post<ApiResponse<AdminLoginResponse>>('/admin/login', data),
   getAuthzMe: () => api.get<ApiResponse<AdminAuthzMeResponse>>('/admin/authz/me'),
@@ -153,9 +189,16 @@ export const adminAPI = {
   getUsers: (params?: any) => api.get<ApiResponse>('/admin/users', { params }),
   getUserLoginLogs: (params?: any) => api.get<ApiResponse>('/admin/user-login-logs', { params }),
   getUser: (id: number) => api.get<ApiResponse>(`/admin/users/${id}`),
+  getUserWallet: (id: number) => api.get<ApiResponse<{ user: any; account: AdminWalletAccount }>>(`/admin/users/${id}/wallet`),
+  getUserWalletTransactions: (id: number, params?: any) =>
+    api.get<ApiResponse<AdminWalletTransaction[]>>(`/admin/users/${id}/wallet/transactions`, { params }),
+  adjustUserWallet: (id: number, data: AdminAdjustWalletPayload) =>
+    api.post<ApiResponse<{ account: AdminWalletAccount; transaction: AdminWalletTransaction }>>(`/admin/users/${id}/wallet/adjust`, data),
   updateUser: (id: number, data: any) => api.put<ApiResponse>(`/admin/users/${id}`, data),
   batchUpdateUserStatus: (data: any) => api.put<ApiResponse>('/admin/users/batch-status', data),
   getUserCouponUsages: (id: number, params?: any) => api.get<ApiResponse>(`/admin/users/${id}/coupon-usages`, { params }),
+  refundOrderToWallet: (id: number, data: AdminRefundToWalletPayload) =>
+    api.post<ApiResponse<{ order: any; transaction: AdminWalletTransaction }>>(`/admin/orders/${id}/refund-to-wallet`, data),
   createCoupon: (data: any) => api.post<ApiResponse>('/admin/coupons', data),
   getCoupons: (params?: any) => api.get<ApiResponse>('/admin/coupons', { params }),
   updateCoupon: (id: number, data: any) => api.put<ApiResponse>(`/admin/coupons/${id}`, data),

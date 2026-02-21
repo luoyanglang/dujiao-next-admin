@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import IdCell from '@/components/IdCell.vue'
 import { userStatusClass, userStatusLabel } from '@/utils/status'
-import { formatDate } from '@/utils/format'
+import { formatDate, formatMoney } from '@/utils/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogHeader, DialogScrollContent, DialogTitle } from '@/components/ui/dialog'
@@ -259,6 +259,7 @@ onMounted(() => {
             <TableHead class="px-6 py-3">{{ t('admin.users.table.nickname') }}</TableHead>
             <TableHead class="px-6 py-3">{{ t('admin.users.table.status') }}</TableHead>
             <TableHead class="px-6 py-3">{{ t('admin.users.table.locale') }}</TableHead>
+            <TableHead class="px-6 py-3">{{ t('admin.users.table.walletBalance') }}</TableHead>
             <TableHead class="px-6 py-3">{{ t('admin.users.table.createdAt') }}</TableHead>
             <TableHead class="px-6 py-3">{{ t('admin.users.table.lastLoginAt') }}</TableHead>
             <TableHead class="px-6 py-3 text-right">{{ t('admin.users.table.action') }}</TableHead>
@@ -266,10 +267,10 @@ onMounted(() => {
         </TableHeader>
         <TableBody class="divide-y divide-border">
           <TableRow v-if="loading">
-            <TableCell colspan="9" class="px-6 py-8 text-center text-muted-foreground">{{ t('admin.common.loading') }}</TableCell>
+            <TableCell colspan="10" class="px-6 py-8 text-center text-muted-foreground">{{ t('admin.common.loading') }}</TableCell>
           </TableRow>
           <TableRow v-else-if="users.length === 0">
-            <TableCell colspan="9" class="px-6 py-8 text-center text-muted-foreground">{{ t('admin.users.empty') }}</TableCell>
+            <TableCell colspan="10" class="px-6 py-8 text-center text-muted-foreground">{{ t('admin.users.empty') }}</TableCell>
           </TableRow>
           <TableRow v-for="user in users" :key="user.id" class="hover:bg-muted/30">
             <TableCell class="px-6 py-4">
@@ -286,6 +287,7 @@ onMounted(() => {
               </span>
             </TableCell>
             <TableCell class="px-6 py-4 text-xs text-muted-foreground">{{ formatLocale(user.locale) }}</TableCell>
+            <TableCell class="px-6 py-4 text-xs font-mono text-foreground">{{ formatMoney(user.wallet_balance, 'CNY') }}</TableCell>
             <TableCell class="px-6 py-4 text-xs text-muted-foreground">{{ formatDate(user.created_at) }}</TableCell>
             <TableCell class="px-6 py-4 text-xs text-muted-foreground">{{ formatDate(user.last_login_at) }}</TableCell>
             <TableCell class="px-6 py-4 text-right">

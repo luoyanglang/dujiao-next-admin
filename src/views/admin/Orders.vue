@@ -51,6 +51,13 @@ const route = useRoute()
 const fulfillmentSubmitting = ref(false)
 const fulfillmentError = ref('')
 const fulfillmentSuccess = ref('')
+const refundSubmitting = ref(false)
+const refundError = ref('')
+const refundSuccess = ref('')
+const refundForm = reactive({
+  amount: '',
+  remark: '',
+})
 const fulfillmentForm = reactive({
   payload: '',
   note: '',
@@ -157,6 +164,7 @@ const openDetail = async (order: any) => {
   showFulfillmentModal.value = false
   showDetail.value = true
   resetFulfillmentForm()
+  resetRefundForm()
   await fetchOrderDetail(order.id)
 }
 
@@ -165,6 +173,7 @@ const openDetailById = async (orderId: number) => {
   showFulfillmentModal.value = false
   showDetail.value = true
   resetFulfillmentForm()
+  resetRefundForm()
   await fetchOrderDetail(orderId)
 }
 
@@ -181,6 +190,7 @@ const closeDetail = () => {
   selectedOrder.value = null
   detailError.value = ''
   resetFulfillmentForm()
+  resetRefundForm()
 }
 
 const closeFulfillment = () => {
@@ -338,6 +348,37 @@ const resetFulfillmentForm = () => {
   fulfillmentSuccess.value = ''
 }
 
+const resetRefundForm = () => {
+  refundForm.amount = ''
+  refundForm.remark = ''
+  refundError.value = ''
+  refundSuccess.value = ''
+}
+
+const parseMoneyValue = (value?: string) => {
+  if (value === null || value === undefined || value === '') return 0
+  const parsed = Number(value)
+  if (Number.isNaN(parsed)) return 0
+  return parsed
+}
+
+const refundableAmountValue = (order: any) => {
+  if (!order) return 0
+  const total = parseMoneyValue(order.total_amount)
+  const refunded = parseMoneyValue(order.refunded_amount)
+  const value = total - refunded
+  if (!Number.isFinite(value)) return 0
+  return Number(Math.max(value, 0).toFixed(2))
+}
+
+const refundableAmountDisplay = (order: any) => formatMoney(refundableAmountValue(order).toFixed(2), order?.currency)
+
+const canRefundToWallet = (order: any) => {
+  if (!order) return false
+  if (!order.user_id) return false
+  return refundableAmountValue(order) > 0
+}
+
 const submitFulfillment = async () => {
   if (!selectedOrder.value) return
   fulfillmentError.value = ''
@@ -368,6 +409,43 @@ const submitFulfillment = async () => {
     fulfillmentError.value = err?.message || t('admin.orders.fulfillmentFailed')
   } finally {
     fulfillmentSubmitting.value = false
+  }
+}
+
+const submitRefundToWallet = async () => {
+  if (!selectedOrder.value) return
+  refundError.value = ''
+  refundSuccess.value = ''
+  if (!canRefundToWallet(selectedOrder.value)) {
+    refundError.value = t('admin.orders.refundNoRemaining')
+    return
+  }
+  const amount = refundForm.amount.trim()
+  const value = Number(amount)
+  if (!amount || Number.isNaN(value) || value <= 0) {
+    refundError.value = t('admin.orders.refundInvalidAmount')
+    return
+  }
+  if (value > refundableAmountValue(selectedOrder.value)) {
+    refundError.value = t('admin.orders.refundExceeded')
+    return
+  }
+
+  refundSubmitting.value = true
+  try {
+    await adminAPI.refundOrderToWallet(Number(selectedOrder.value.id), {
+      amount,
+      remark: refundForm.remark.trim() || undefined,
+    })
+    refundSuccess.value = t('admin.orders.refundSuccess')
+    refundForm.amount = ''
+    refundForm.remark = ''
+    await fetchOrderDetail(Number(selectedOrder.value.id))
+    fetchOrders(pagination.value.page)
+  } catch (err: any) {
+    refundError.value = err?.message || t('admin.orders.refundFailed')
+  } finally {
+    refundSubmitting.value = false
   }
 }
 
@@ -671,6 +749,24 @@ watch(
                     <div class="text-foreground font-mono mt-1">{{ formatMoney(selectedOrder.total_amount, selectedOrder.currency) }}</div>
                   </CardContent>
                 </Card>
+                <Card v-if="hasPositiveAmount(selectedOrder.wallet_paid_amount)" class="rounded-lg border-border bg-background shadow-none">
+                  <CardContent class="p-3">
+                    <div class="text-xs text-muted-foreground">{{ t('admin.orders.detailWalletPaid') }}</div>
+                    <div class="text-foreground font-mono mt-1">{{ formatMoney(selectedOrder.wallet_paid_amount, selectedOrder.currency) }}</div>
+                  </CardContent>
+                </Card>
+                <Card v-if="hasPositiveAmount(selectedOrder.online_paid_amount)" class="rounded-lg border-border bg-background shadow-none">
+                  <CardContent class="p-3">
+                    <div class="text-xs text-muted-foreground">{{ t('admin.orders.detailOnlinePaid') }}</div>
+                    <div class="text-foreground font-mono mt-1">{{ formatMoney(selectedOrder.online_paid_amount, selectedOrder.currency) }}</div>
+                  </CardContent>
+                </Card>
+                <Card v-if="hasPositiveAmount(selectedOrder.refunded_amount)" class="rounded-lg border-border bg-background shadow-none">
+                  <CardContent class="p-3">
+                    <div class="text-xs text-muted-foreground">{{ t('admin.orders.detailRefunded') }}</div>
+                    <div class="text-foreground font-mono mt-1">{{ formatMoney(selectedOrder.refunded_amount, selectedOrder.currency) }}</div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
 
@@ -871,6 +967,40 @@ watch(
                 </Table>
               </div>
               <div v-else class="text-xs text-muted-foreground">{{ t('admin.payments.empty') }}</div>
+            </div>
+
+            <div v-if="selectedOrder.user_id" class="rounded-xl border border-border bg-muted/20 p-4">
+              <h3 class="text-sm font-semibold text-foreground mb-3">{{ t('admin.orders.refundToWalletTitle') }}</h3>
+              <div class="mb-3 text-xs text-muted-foreground">
+                {{ t('admin.orders.refundableAmount') }}：{{ refundableAmountDisplay(selectedOrder) }}
+              </div>
+              <form class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_2fr_auto]" @submit.prevent="submitRefundToWallet">
+                <Input
+                  v-model="refundForm.amount"
+                  :placeholder="t('admin.orders.refundAmountPlaceholder')"
+                  :disabled="refundSubmitting || !canRefundToWallet(selectedOrder)"
+                />
+                <Input
+                  v-model="refundForm.remark"
+                  :placeholder="t('admin.orders.refundRemarkPlaceholder')"
+                  :disabled="refundSubmitting || !canRefundToWallet(selectedOrder)"
+                />
+                <Button
+                  type="submit"
+                  :disabled="refundSubmitting || !canRefundToWallet(selectedOrder)"
+                >
+                  {{ refundSubmitting ? t('admin.orders.refunding') : t('admin.orders.refundSubmit') }}
+                </Button>
+              </form>
+              <div v-if="!canRefundToWallet(selectedOrder)" class="mt-3 text-xs text-muted-foreground">
+                {{ t('admin.orders.refundNoRemaining') }}
+              </div>
+              <div v-if="refundError" class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {{ refundError }}
+              </div>
+              <div v-if="refundSuccess" class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                {{ refundSuccess }}
+              </div>
             </div>
           </div>
         </div>

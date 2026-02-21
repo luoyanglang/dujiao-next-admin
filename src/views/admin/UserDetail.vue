@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   orderStatusClass as orderStatusClassMap,
   orderStatusLabel as orderStatusLabelMap,
@@ -26,11 +27,12 @@ const userId = computed(() => Number(route.params.id))
 const user = ref<any>(null)
 const userError = ref('')
 
-const activeTab = ref<'orders' | 'payments' | 'coupons'>('orders')
-const tabs = computed<Array<{ key: 'orders' | 'payments' | 'coupons'; label: string }>>(() => [
+const activeTab = ref<'orders' | 'payments' | 'coupons' | 'wallet'>('orders')
+const tabs = computed<Array<{ key: 'orders' | 'payments' | 'coupons' | 'wallet'; label: string }>>(() => [
   { key: 'orders', label: t('admin.userDetail.tabs.orders') },
   { key: 'payments', label: t('admin.userDetail.tabs.payments') },
   { key: 'coupons', label: t('admin.userDetail.tabs.coupons') },
+  { key: 'wallet', label: t('admin.userDetail.tabs.wallet') },
 ])
 
 const orders = ref<any[]>([])
@@ -47,6 +49,20 @@ const couponUsages = ref<any[]>([])
 const couponsLoading = ref(false)
 const couponsPagination = ref({ page: 1, page_size: 20, total: 0, total_page: 1 })
 const couponsJumpPage = ref('')
+
+const walletAccount = ref<any>(null)
+const walletTransactions = ref<any[]>([])
+const walletLoading = ref(false)
+const walletPagination = ref({ page: 1, page_size: 20, total: 0, total_page: 1 })
+const walletJumpPage = ref('')
+const walletSubmitting = ref(false)
+const walletError = ref('')
+const walletSuccess = ref('')
+const walletAdjustForm = reactive({
+  operation: 'add',
+  amount: '',
+  remark: '',
+})
 
 const fetchUser = async () => {
   if (!Number.isFinite(userId.value) || userId.value <= 0) return
@@ -106,6 +122,39 @@ const fetchCoupons = async (page = 1) => {
   }
 }
 
+const fetchWalletAccount = async () => {
+  if (!Number.isFinite(userId.value) || userId.value <= 0) return
+  const response = await adminAPI.getUserWallet(userId.value)
+  walletAccount.value = response.data.data?.account || null
+}
+
+const fetchWalletTransactions = async (page = 1) => {
+  if (!Number.isFinite(userId.value) || userId.value <= 0) return
+  walletLoading.value = true
+  try {
+    const response = await adminAPI.getUserWalletTransactions(userId.value, {
+      page,
+      page_size: walletPagination.value.page_size,
+    })
+    walletTransactions.value = (response.data.data as any[]) || []
+    walletPagination.value = response.data.pagination || walletPagination.value
+  } finally {
+    walletLoading.value = false
+  }
+}
+
+const loadWalletData = async (page = walletPagination.value.page) => {
+  walletError.value = ''
+  try {
+    await Promise.all([
+      fetchWalletAccount(),
+      fetchWalletTransactions(page),
+    ])
+  } catch (err: any) {
+    walletError.value = err?.message || t('admin.userDetail.wallet.errors.loadFailed')
+  }
+}
+
 const jumpOrdersPage = () => {
   if (!ordersJumpPage.value) return
   const raw = Number(ordersJumpPage.value)
@@ -133,14 +182,27 @@ const jumpCouponsPage = () => {
   fetchCoupons(target)
 }
 
-const changeTab = (tab: 'orders' | 'payments' | 'coupons') => {
+const jumpWalletPage = () => {
+  if (!walletJumpPage.value) return
+  const raw = Number(walletJumpPage.value)
+  if (Number.isNaN(raw)) return
+  const target = Math.min(Math.max(Math.floor(raw), 1), walletPagination.value.total_page)
+  if (target === walletPagination.value.page) return
+  fetchWalletTransactions(target)
+}
+
+const changeTab = (tab: 'orders' | 'payments' | 'coupons' | 'wallet') => {
   activeTab.value = tab
   if (tab === 'orders') {
     fetchOrders(ordersPagination.value.page)
   } else if (tab === 'payments') {
     fetchPayments(paymentsPagination.value.page)
-  } else {
+  } else if (tab === 'coupons') {
     fetchCoupons(couponsPagination.value.page)
+  } else {
+    walletError.value = ''
+    walletSuccess.value = ''
+    void loadWalletData(walletPagination.value.page)
   }
 }
 
@@ -154,6 +216,59 @@ const orderStatusClass = (status?: string) => orderStatusClassMap(status)
 const orderStatusLabel = (status?: string) => orderStatusLabelMap(t, status)
 const paymentStatusClass = (status?: string) => paymentStatusClassMap(status)
 const paymentStatusLabel = (status?: string) => paymentStatusLabelMap(t, status)
+
+const walletDirectionClass = (direction?: string) => {
+  if (direction === 'in') return 'theme-badge-success'
+  if (direction === 'out') return 'theme-badge-danger'
+  return 'theme-badge-warning'
+}
+
+const walletDirectionLabel = (direction?: string) => {
+  if (direction === 'in') return t('admin.userDetail.wallet.directionIn')
+  if (direction === 'out') return t('admin.userDetail.wallet.directionOut')
+  return direction || '-'
+}
+
+const walletTypeLabel = (type?: string) => {
+  const key = `admin.userDetail.wallet.types.${type || ''}`
+  const translated = t(key)
+  if (translated === key) return type || '-'
+  return translated
+}
+
+const walletBalanceDisplay = computed(() => formatMoney(walletAccount.value?.balance, 'CNY'))
+
+const submitWalletAdjust = async () => {
+  if (!Number.isFinite(userId.value) || userId.value <= 0) return
+  walletError.value = ''
+  walletSuccess.value = ''
+  const amount = walletAdjustForm.amount.trim()
+  const value = Number(amount)
+  if (!amount || Number.isNaN(value) || value <= 0) {
+    walletError.value = t('admin.userDetail.wallet.errors.invalidAmount')
+    return
+  }
+  walletSubmitting.value = true
+  try {
+    const response = await adminAPI.adjustUserWallet(userId.value, {
+      operation: walletAdjustForm.operation as 'add' | 'subtract',
+      amount,
+      remark: walletAdjustForm.remark.trim() || undefined,
+    })
+    walletAccount.value = response.data.data?.account || walletAccount.value
+    walletAdjustForm.amount = ''
+    walletAdjustForm.remark = ''
+    await Promise.all([
+      fetchUser(),
+      fetchWalletTransactions(1),
+    ])
+    walletSuccess.value = t('admin.userDetail.wallet.adjustSuccess')
+  } catch (err: any) {
+    walletError.value = err?.message || t('admin.userDetail.wallet.errors.adjustFailed')
+  } finally {
+    walletSubmitting.value = false
+  }
+}
 
 const formatLocale = (raw?: string) => {
   if (!raw) return '-'
@@ -194,6 +309,7 @@ watch(
     fetchOrders(1)
     fetchPayments(1)
     fetchCoupons(1)
+    void loadWalletData(1)
   }
 )
 </script>
@@ -271,6 +387,12 @@ watch(
         <CardContent class="p-3">
           <div class="text-xs text-muted-foreground">{{ t('admin.userDetail.fields.lastLoginAt') }}</div>
           <div class="text-sm text-foreground">{{ formatDate(user?.last_login_at) }}</div>
+        </CardContent>
+      </Card>
+      <Card class="rounded-lg border-border bg-background shadow-none">
+        <CardContent class="p-3">
+          <div class="text-xs text-muted-foreground">{{ t('admin.userDetail.fields.walletBalance') }}</div>
+          <div class="text-sm font-mono text-foreground">{{ formatMoney(user?.wallet_balance, 'CNY') }}</div>
         </CardContent>
       </Card>
     </div>
@@ -543,6 +665,140 @@ watch(
             >
               {{ t('admin.common.nextPage') }}
             </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="activeTab === 'wallet'" class="space-y-4">
+      <Card class="rounded-lg border-border bg-background shadow-none">
+        <CardContent class="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+          <div>
+            <div class="text-xs text-muted-foreground">{{ t('admin.userDetail.wallet.balanceLabel') }}</div>
+            <div class="mt-1 text-xl font-bold text-foreground">{{ walletBalanceDisplay }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-muted-foreground">{{ t('admin.userDetail.wallet.updatedAtLabel') }}</div>
+            <div class="mt-1 text-sm text-foreground">{{ formatDate(walletAccount?.updated_at) }}</div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div class="rounded-xl border border-border bg-card p-4">
+        <div class="mb-4 text-sm font-semibold text-foreground">{{ t('admin.userDetail.wallet.adjustTitle') }}</div>
+        <form class="grid grid-cols-1 gap-3 md:grid-cols-[180px_1fr_2fr_auto]" @submit.prevent="submitWalletAdjust">
+          <div>
+            <label class="mb-1.5 block text-xs text-muted-foreground">{{ t('admin.userDetail.wallet.operationLabel') }}</label>
+            <Select v-model="walletAdjustForm.operation">
+              <SelectTrigger class="h-9 w-full">
+                <SelectValue :placeholder="t('admin.userDetail.wallet.operations.add')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="add">{{ t('admin.userDetail.wallet.operations.add') }}</SelectItem>
+                <SelectItem value="subtract">{{ t('admin.userDetail.wallet.operations.subtract') }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs text-muted-foreground">{{ t('admin.userDetail.wallet.amountLabel') }}</label>
+            <Input v-model="walletAdjustForm.amount" :placeholder="t('admin.userDetail.wallet.amountPlaceholder')" />
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs text-muted-foreground">{{ t('admin.userDetail.wallet.remarkLabel') }}</label>
+            <Input v-model="walletAdjustForm.remark" :placeholder="t('admin.userDetail.wallet.remarkPlaceholder')" />
+          </div>
+          <div class="flex items-end">
+            <Button type="submit" :disabled="walletSubmitting">
+              {{ walletSubmitting ? t('admin.userDetail.wallet.adjusting') : t('admin.userDetail.wallet.adjustSubmit') }}
+            </Button>
+          </div>
+        </form>
+        <div v-if="walletError" class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {{ walletError }}
+        </div>
+        <div v-if="walletSuccess" class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+          {{ walletSuccess }}
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-border bg-card">
+        <Table>
+          <TableHeader class="border-b border-border bg-muted/40 text-xs uppercase text-muted-foreground">
+            <TableRow>
+              <TableHead class="px-6 py-3">{{ t('admin.userDetail.wallet.table.id') }}</TableHead>
+              <TableHead class="px-6 py-3">{{ t('admin.userDetail.wallet.table.type') }}</TableHead>
+              <TableHead class="px-6 py-3">{{ t('admin.userDetail.wallet.table.direction') }}</TableHead>
+              <TableHead class="px-6 py-3">{{ t('admin.userDetail.wallet.table.amount') }}</TableHead>
+              <TableHead class="px-6 py-3">{{ t('admin.userDetail.wallet.table.balanceAfter') }}</TableHead>
+              <TableHead class="px-6 py-3">{{ t('admin.userDetail.wallet.table.remark') }}</TableHead>
+              <TableHead class="px-6 py-3">{{ t('admin.userDetail.wallet.table.createdAt') }}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody class="divide-y divide-border">
+            <TableRow v-if="walletLoading">
+              <TableCell colspan="7" class="px-6 py-8 text-center text-muted-foreground">{{ t('admin.common.loading') }}</TableCell>
+            </TableRow>
+            <TableRow v-else-if="walletTransactions.length === 0">
+              <TableCell colspan="7" class="px-6 py-8 text-center text-muted-foreground">{{ t('admin.userDetail.empty') }}</TableCell>
+            </TableRow>
+            <TableRow v-for="item in walletTransactions" :key="item.id" class="hover:bg-muted/30">
+              <TableCell class="px-6 py-4">
+                <IdCell :value="item.id" />
+              </TableCell>
+              <TableCell class="px-6 py-4 text-xs text-foreground">{{ walletTypeLabel(item.type) }}</TableCell>
+              <TableCell class="px-6 py-4 text-xs">
+                <span class="inline-flex rounded-full border px-2.5 py-1 text-xs" :class="walletDirectionClass(item.direction)">
+                  {{ walletDirectionLabel(item.direction) }}
+                </span>
+              </TableCell>
+              <TableCell class="px-6 py-4 text-xs font-mono text-foreground">{{ formatMoney(item.amount, item.currency) }}</TableCell>
+              <TableCell class="px-6 py-4 text-xs font-mono text-foreground">{{ formatMoney(item.balance_after, item.currency) }}</TableCell>
+              <TableCell class="px-6 py-4 text-xs text-muted-foreground">{{ item.remark || '-' }}</TableCell>
+              <TableCell class="px-6 py-4 text-xs text-muted-foreground">{{ formatDate(item.created_at) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <div
+          v-if="walletPagination.total_page > 1"
+          class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4"
+        >
+          <span class="text-xs text-muted-foreground">
+            {{ t('admin.common.pageInfo', { total: walletPagination.total, page: walletPagination.page, totalPage: walletPagination.total_page }) }}
+          </span>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-2">
+              <Input
+                v-model="walletJumpPage"
+                type="number"
+                min="1"
+                :max="walletPagination.total_page"
+                class="h-8 w-20"
+                :placeholder="t('admin.common.jumpPlaceholder')"
+              />
+              <Button variant="outline" size="sm" class="h-8" @click="jumpWalletPage">
+                {{ t('admin.common.jumpTo') }}
+              </Button>
+            </div>
+            <div class="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                class="h-8"
+                :disabled="walletPagination.page <= 1"
+                @click="fetchWalletTransactions(walletPagination.page - 1)"
+              >
+                {{ t('admin.common.prevPage') }}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                class="h-8"
+                :disabled="walletPagination.page >= walletPagination.total_page"
+                @click="fetchWalletTransactions(walletPagination.page + 1)"
+              >
+                {{ t('admin.common.nextPage') }}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
