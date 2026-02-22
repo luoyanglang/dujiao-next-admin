@@ -54,7 +54,6 @@ const form = reactive({
   description: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' } as any,
   content: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' } as any,
   price_amount: 0,
-  price_currency: '',
   images: [] as string[],
   tags: [] as string[],
   purchase_type: 'member',
@@ -65,6 +64,7 @@ const form = reactive({
   sort_order: 0,
   manual_form_schema: { fields: [] as any[] },
 })
+const siteCurrency = ref('CNY')
 
 const getCurrentLangName = () => {
   return languages.value.find((item) => item.code === currentLang.value)?.name || t('admin.common.lang.zhCN')
@@ -292,6 +292,17 @@ const fetchCategories = async () => {
   }
 }
 
+const fetchSiteCurrency = async () => {
+  try {
+    const response = await adminAPI.getSettings({ key: 'site_config' })
+    const data = response.data?.data as any
+    const raw = String(data?.currency || 'CNY').trim().toUpperCase()
+    siteCurrency.value = /^[A-Z]{3}$/.test(raw) ? raw : 'CNY'
+  } catch {
+    siteCurrency.value = 'CNY'
+  }
+}
+
 const handleSearch = () => {
   pagination.page = 1
   fetchProducts()
@@ -359,7 +370,6 @@ const openEditModal = (product: any) => {
     description: product.description || { 'zh-CN': '', 'zh-TW': '', 'en-US': '' },
     content: product.content || { 'zh-CN': '', 'zh-TW': '', 'en-US': '' },
     price_amount: Number(product.price_amount || 0),
-    price_currency: String(product.price_currency || '').trim().toUpperCase(),
     images: imagesList,
     tags: tagsList,
     purchase_type: product.purchase_type || 'member',
@@ -386,7 +396,6 @@ const resetForm = () => {
     description: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' },
     content: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' },
     price_amount: 0,
-    price_currency: '',
     images: [],
     tags: [],
     purchase_type: 'member',
@@ -410,7 +419,6 @@ const handleSubmit = async () => {
       description: form.description,
       content: form.content,
       price_amount: Number(form.price_amount),
-      price_currency: String(form.price_currency || '').trim().toUpperCase(),
       images: form.images,
       tags: form.tags,
       purchase_type: form.purchase_type,
@@ -507,6 +515,7 @@ const uploadImage = async (file: File) => {
 onMounted(() => {
   fetchProducts()
   fetchCategories()
+  fetchSiteCurrency()
   if (route.query.action === 'create') {
     openCreateModal()
     router.replace({ query: { ...route.query, action: undefined } })
@@ -627,7 +636,7 @@ watch(
                 </div>
               </div>
             </TableCell>
-            <TableCell class="px-6 py-4 font-mono text-foreground">{{ formatPrice(product.price_amount, product.price_currency) }}</TableCell>
+            <TableCell class="px-6 py-4 font-mono text-foreground">{{ formatPrice(product.price_amount, siteCurrency) }}</TableCell>
             <TableCell class="px-6 py-4">
               <span v-if="product.category" class="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">
                 {{ getLocalizedText(product.category.name) }}
@@ -875,12 +884,6 @@ watch(
               <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.priceAmount') }}</label>
               <Input v-model.number="form.price_amount" type="number" step="0.01" min="0" required :placeholder="t('admin.products.form.priceAmountPlaceholder')" />
               <p class="mt-1 text-xs text-muted-foreground">{{ t('admin.products.form.priceAmountTip') }}</p>
-            </div>
-
-            <div class="col-span-1">
-              <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.priceCurrency') }}</label>
-              <Input v-model="form.price_currency" required :placeholder="t('admin.products.form.priceCurrencyPlaceholder')" />
-              <p class="mt-1 text-xs text-muted-foreground">{{ t('admin.products.form.priceCurrencyTip') }}</p>
             </div>
 
             <div class="col-span-1">

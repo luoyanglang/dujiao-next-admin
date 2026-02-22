@@ -63,6 +63,7 @@ const walletAdjustForm = reactive({
   amount: '',
   remark: '',
 })
+const siteCurrency = ref('CNY')
 
 const fetchUser = async () => {
   if (!Number.isFinite(userId.value) || userId.value <= 0) return
@@ -72,6 +73,17 @@ const fetchUser = async () => {
     user.value = response.data.data
   } catch (err: any) {
     userError.value = err?.message || t('admin.userDetail.fetchFailed')
+  }
+}
+
+const fetchSiteCurrency = async () => {
+  try {
+    const response = await adminAPI.getSettings({ key: 'site_config' })
+    const data = response.data?.data as any
+    const raw = String(data?.currency || 'CNY').trim().toUpperCase()
+    siteCurrency.value = /^[A-Z]{3}$/.test(raw) ? raw : 'CNY'
+  } catch {
+    siteCurrency.value = 'CNY'
   }
 }
 
@@ -236,7 +248,7 @@ const walletTypeLabel = (type?: string) => {
   return translated
 }
 
-const walletBalanceDisplay = computed(() => formatMoney(walletAccount.value?.balance, 'CNY'))
+const walletBalanceDisplay = computed(() => formatMoney(walletAccount.value?.balance, siteCurrency.value))
 
 const submitWalletAdjust = async () => {
   if (!Number.isFinite(userId.value) || userId.value <= 0) return
@@ -298,6 +310,7 @@ const formatScopeProducts = (products?: any[]) => {
 }
 
 onMounted(() => {
+  fetchSiteCurrency()
   fetchUser()
   fetchOrders()
 })
@@ -392,7 +405,7 @@ watch(
       <Card class="rounded-lg border-border bg-background shadow-none">
         <CardContent class="p-3">
           <div class="text-xs text-muted-foreground">{{ t('admin.userDetail.fields.walletBalance') }}</div>
-          <div class="text-sm font-mono text-foreground">{{ formatMoney(user?.wallet_balance, 'CNY') }}</div>
+          <div class="text-sm font-mono text-foreground">{{ formatMoney(user?.wallet_balance, siteCurrency) }}</div>
         </CardContent>
       </Card>
     </div>

@@ -44,6 +44,26 @@ const tabs = computed(() => [
   { label: t('admin.settings.tabs.security'), value: 'security' },
 ])
 
+const fallbackCurrencyOptions = [
+  'CNY', 'USD', 'EUR', 'GBP', 'JPY', 'KRW', 'HKD', 'TWD', 'SGD', 'AUD',
+  'CAD', 'CHF', 'NZD', 'SEK', 'NOK', 'DKK', 'AED', 'SAR', 'MYR', 'THB',
+  'PHP', 'IDR', 'VND', 'INR', 'RUB', 'TRY', 'ZAR', 'BRL', 'MXN', 'ARS',
+]
+
+const currencyOptions = computed(() => {
+  const values: string[] = []
+  if (typeof Intl !== 'undefined' && typeof (Intl as any).supportedValuesOf === 'function') {
+    const candidate = (Intl as any).supportedValuesOf('currency')
+    if (Array.isArray(candidate)) {
+      values.push(...candidate.map((item: unknown) => String(item || '').trim().toUpperCase()))
+    }
+  }
+  values.push(...fallbackCurrencyOptions)
+  const unique = Array.from(new Set(values.filter((item) => /^[A-Z]{3}$/.test(item))))
+  const filtered = unique.filter((item) => item !== 'CNY').sort()
+  return ['CNY', ...filtered]
+})
+
 const createLocalizedField = () => ({ 'zh-CN': '', 'zh-TW': '', 'en-US': '' } as Record<SupportedLanguage, string>)
 const createSiteScriptItem = (): SiteScriptItem => ({
   name: '',
@@ -103,6 +123,7 @@ const form = reactive({
   brand: {
     site_name: '',
   },
+  currency: 'CNY',
   contact: {
     telegram: '',
     whatsapp: '',
@@ -250,6 +271,10 @@ const fetchSettings = async () => {
       if (data.brand) {
         form.brand.site_name = String(data.brand.site_name || '')
       }
+      {
+        const rawCurrency = String(data.currency || 'CNY').trim().toUpperCase()
+        form.currency = /^[A-Z]{3}$/.test(rawCurrency) ? rawCurrency : 'CNY'
+      }
       if (data.contact) {
         Object.assign(form.contact, data.contact)
       }
@@ -369,9 +394,10 @@ const fetchSettings = async () => {
 const saveSiteSettings = async () => {
   const payload = {
     key: 'site_config',
-    value: {
-      brand: form.brand,
-      contact: form.contact,
+      value: {
+        brand: form.brand,
+        currency: String(form.currency || 'CNY').trim().toUpperCase(),
+        contact: form.contact,
       seo: form.seo,
       about: form.about,
       legal: form.legal,
@@ -630,10 +656,19 @@ onMounted(() => {
           <h2 class="text-lg font-semibold">{{ t('admin.settings.brand.title') }}</h2>
           <p class="mt-1 text-xs text-muted-foreground">{{ t('admin.settings.brand.subtitle') }}</p>
         </div>
-        <div class="grid grid-cols-1 gap-6 p-6">
+        <div class="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
           <div class="space-y-2">
             <label class="text-xs font-medium text-muted-foreground">{{ t('admin.settings.brand.siteName') }}</label>
             <Input v-model="form.brand.site_name" :placeholder="t('admin.settings.brand.siteNamePlaceholder')" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-xs font-medium text-muted-foreground">{{ t('admin.settings.brand.currency') }}</label>
+            <select v-model="form.currency" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <option v-for="item in currencyOptions" :key="item" :value="item">
+                {{ item }}
+              </option>
+            </select>
+            <p class="text-xs text-muted-foreground">{{ t('admin.settings.brand.currencyTip') }}</p>
           </div>
         </div>
       </div>

@@ -37,6 +37,7 @@ const normalizeFilterValue = (value: string) => (value === '__all__' ? '' : valu
 const showModal = ref(false)
 const error = ref('')
 const editingId = ref<number | null>(null)
+const siteCurrency = ref('CNY')
 const form = reactive({
   email: '',
   nickname: '',
@@ -65,6 +66,17 @@ const fetchUsers = async (page = 1) => {
     users.value = []
   } finally {
     loading.value = false
+  }
+}
+
+const fetchSiteCurrency = async () => {
+  try {
+    const response = await adminAPI.getSettings({ key: 'site_config' })
+    const data = response.data?.data as any
+    const raw = String(data?.currency || 'CNY').trim().toUpperCase()
+    siteCurrency.value = /^[A-Z]{3}$/.test(raw) ? raw : 'CNY'
+  } catch {
+    siteCurrency.value = 'CNY'
   }
 }
 
@@ -178,6 +190,7 @@ const formatLocale = (raw?: string) => {
 }
 
 onMounted(() => {
+  fetchSiteCurrency()
   fetchUsers()
 })
 </script>
@@ -287,7 +300,7 @@ onMounted(() => {
               </span>
             </TableCell>
             <TableCell class="px-6 py-4 text-xs text-muted-foreground">{{ formatLocale(user.locale) }}</TableCell>
-            <TableCell class="px-6 py-4 text-xs font-mono text-foreground">{{ formatMoney(user.wallet_balance, 'CNY') }}</TableCell>
+            <TableCell class="px-6 py-4 text-xs font-mono text-foreground">{{ formatMoney(user.wallet_balance, siteCurrency) }}</TableCell>
             <TableCell class="px-6 py-4 text-xs text-muted-foreground">{{ formatDate(user.created_at) }}</TableCell>
             <TableCell class="px-6 py-4 text-xs text-muted-foreground">{{ formatDate(user.last_login_at) }}</TableCell>
             <TableCell class="px-6 py-4 text-right">
