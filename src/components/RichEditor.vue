@@ -110,17 +110,44 @@ const editor = useEditor({
   },
 })
 
+const isSourceMode = ref(false)
+const sourceContent = ref('')
+
 watch(
   () => props.modelValue,
   (value) => {
-    const displayValue = processHtmlForDisplay(value)
-    const isSame = editor.value?.getHTML() === displayValue
+    if (isSourceMode.value) {
+      if (sourceContent.value !== value) {
+        sourceContent.value = value
+      }
+    } else {
+      const displayValue = processHtmlForDisplay(value)
+      const isSame = editor.value?.getHTML() === displayValue
 
-    if (!isSame && editor.value) {
-      editor.value.commands.setContent(displayValue)
+      if (!isSame && editor.value) {
+        editor.value.commands.setContent(displayValue)
+      }
     }
   }
 )
+
+const toggleSourceMode = () => {
+  if (isSourceMode.value) {
+    if (editor.value) {
+      const displayValue = processHtmlForDisplay(sourceContent.value)
+      editor.value.commands.setContent(displayValue)
+      emit('update:modelValue', sourceContent.value)
+    }
+  } else {
+    sourceContent.value = props.modelValue
+  }
+  isSourceMode.value = !isSourceMode.value
+}
+
+const handleSourceInput = (event: Event) => {
+  const target = event.target as HTMLTextAreaElement
+  emit('update:modelValue', target.value)
+}
 
 const addLink = () => {
   const url = window.prompt('输入链接URL:')
@@ -200,7 +227,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="rich-editor">
-    <div v-if="editor" class="editor-toolbar">
+    <div v-if="editor" class="editor-toolbar" :class="{ 'is-source-mode': isSourceMode }">
       <button type="button" class="toolbar-btn" title="粗体" :class="{ 'is-active': editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()">
         <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
           <path d="M11 5H7a1 1 0 000 2h4a1 1 0 100-2zM7 11h6a1 1 0 100-2H7a1 1 0 100 2zM13 15H7a1 1 0 100 2h6a1 1 0 100-2z" />
@@ -359,9 +386,23 @@ onBeforeUnmount(() => {
           <path fill-rule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H9a5 5 0 00-5 5v2a1 1 0 11-2 0v-2a7 7 0 017-7h5.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
         </svg>
       </button>
+
+      <div class="toolbar-divider"></div>
+
+      <button type="button" class="toolbar-btn code-mode-btn" title="代码模式" :class="{ 'is-active': isSourceMode }" @click="toggleSourceMode">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        </svg>
+      </button>
     </div>
 
-    <editor-content :editor="editor" class="editor-content" />
+    <textarea
+      v-if="isSourceMode"
+      v-model="sourceContent"
+      class="w-full min-h-[300px] p-4 font-mono text-sm bg-muted/10 text-foreground resize-y focus:outline-none"
+      @input="handleSourceInput"
+    ></textarea>
+    <editor-content v-show="!isSourceMode" :editor="editor" class="editor-content" />
   </div>
 </template>
 
@@ -386,6 +427,15 @@ onBeforeUnmount(() => {
 
 .toolbar-divider {
   @apply w-px h-6 bg-border mx-1;
+}
+
+.editor-toolbar.is-source-mode .toolbar-btn:not(.code-mode-btn) {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.editor-toolbar.is-source-mode .toolbar-divider {
+  opacity: 0.3;
 }
 
 :deep(.editor-content) {
