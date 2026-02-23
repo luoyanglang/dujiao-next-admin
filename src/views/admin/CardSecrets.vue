@@ -15,6 +15,7 @@ const productIdInput = ref('')
 const { t } = useI18n()
 const productIdHint = ref(t('admin.cardSecrets.productHintEmpty'))
 const productInfo = ref<any>(null)
+const skuFilterValue = ref('__all__')
 const adminPath = import.meta.env.VITE_ADMIN_PATH || ''
 
 const stats = ref<any>(null)
@@ -78,12 +79,86 @@ const parseProductId = () => {
   return parsed
 }
 
+const parseSkuId = () => {
+  if (skuFilterValue.value === '__all__') return 0
+  const parsed = Number(skuFilterValue.value)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 0
+  }
+  return Math.floor(parsed)
+}
+
+const formatSkuSpecValues = (specValues: any) => {
+  if (!specValues || typeof specValues !== 'object' || Array.isArray(specValues)) return ''
+  return Object.entries(specValues as Record<string, any>)
+    .map(([key, value]) => {
+      const keyText = String(key || '').trim()
+      const valueText = Array.isArray(value)
+        ? value.map((entry) => String(entry || '').trim()).filter(Boolean).join(', ')
+        : String(value ?? '').trim()
+      if (!valueText) return ''
+      if (!keyText) return valueText
+      return `${keyText}:${valueText}`
+    })
+    .filter(Boolean)
+    .join(' / ')
+}
+
+const buildSkuLabel = (sku: any) => {
+  const skuCode = String(sku?.sku_code || '').trim()
+  const specText = formatSkuSpecValues(sku?.spec_values)
+  if (skuCode && specText) return `${skuCode} · ${specText}`
+  if (skuCode) return skuCode
+  if (specText) return specText
+  if (sku?.id) return `#${sku.id}`
+  return '-'
+}
+
 const productInfoName = computed(() => {
   if (!productInfo.value) return ''
   return getLocalizedText(productInfo.value.title)
 })
 
 const currentProductId = computed(() => parseProductId())
+const currentSkuId = computed(() => parseSkuId())
+
+const availableSkus = computed(() => {
+  const rows = Array.isArray(productInfo.value?.skus) ? productInfo.value.skus : []
+  return rows
+    .filter((sku: any) => Boolean(sku?.is_active))
+    .map((sku: any) => ({
+      ...sku,
+      id: Number(sku.id),
+      label: buildSkuLabel(sku),
+    }))
+    .filter((sku: any) => Number.isFinite(sku.id) && sku.id > 0)
+})
+
+const skuFilterDisabled = computed(() => !currentProductId.value || availableSkus.value.length === 0)
+
+const syncSkuSelection = () => {
+  if (!currentProductId.value || availableSkus.value.length === 0) {
+    skuFilterValue.value = '__all__'
+    return
+  }
+  if (availableSkus.value.length === 1) {
+    skuFilterValue.value = String(availableSkus.value[0].id)
+    return
+  }
+  const matched = availableSkus.value.some((sku: any) => sku.id === currentSkuId.value)
+  if (!matched) {
+    skuFilterValue.value = '__all__'
+  }
+}
+
+const resolveSkuLabelById = (skuID: number) => {
+  if (!skuID) return '-'
+  const target = availableSkus.value.find((sku: any) => sku.id === skuID)
+  if (!target) return `#${skuID}`
+  return target.label
+}
+
+const selectedSkuRequired = computed(() => Boolean(currentProductId.value) && availableSkus.value.length > 1 && currentSkuId.value <= 0)
 
 const resolveProductName = (productId: number) => {
   if (currentProductId.value && productId === currentProductId.value) {
@@ -105,8 +180,13 @@ const handleProductChange = () => {
       total: 0,
       total_page: 1,
     }
+    skuFilterValue.value = '__all__'
     fetchCardSecrets(1)
     return
+  }
+  if (productInfo.value && Number(productInfo.value.id) !== productId) {
+    productInfo.value = null
+    skuFilterValue.value = '__all__'
   }
   productIdHint.value = t('admin.cardSecrets.productHintCurrent', { id: productId })
 }
@@ -118,13 +198,16 @@ const loadProductInfo = async () => {
   const productId = parseProductId()
   if (!productId) {
     productInfo.value = null
+    skuFilterValue.value = '__all__'
     return
   }
   try {
     const response = await adminAPI.getProduct(productId)
     productInfo.value = response.data.data
+    syncSkuSelection()
   } catch (error) {
     productInfo.value = null
+    skuFilterValue.value = '__all__'
   }
 }
 
@@ -136,7 +219,10 @@ const refreshStats = async () => {
   }
   statsLoading.value = true
   try {
-    const response = await adminAPI.getCardSecretStats({ product_id: productId })
+    const response = await adminAPI.getCardSecretStats({
+      product_id: productId,
+      sku_id: currentSkuId.value || undefined,
+    })
     stats.value = response.data.data
   } catch (error) {
     stats.value = null
@@ -155,6 +241,7 @@ const fetchBatches = async (page = 1) => {
   try {
     const response = await adminAPI.getCardSecretBatches({
       product_id: productId,
+      sku_id: currentSkuId.value || undefined,
       page,
       page_size: batchPagination.value.page_size,
     })
@@ -178,6 +265,7 @@ const fetchCardSecrets = async (page = 1) => {
     }
     if (productId) {
       params.product_id = productId
+      params.sku_id = currentSkuId.value || undefined
     }
     const response = await adminAPI.getCardSecrets(params)
     cardSecrets.value = (response.data.data as any[]) || []
@@ -189,10 +277,10 @@ const fetchCardSecrets = async (page = 1) => {
   }
 }
 
-const refreshAll = () => {
+const refreshAll = async () => {
   const productId = parseProductId()
   if (productId) {
-    loadProductInfo()
+    await loadProductInfo()
     refreshStats()
     fetchBatches(1)
   } else {
@@ -205,6 +293,7 @@ const refreshAll = () => {
       total: 0,
       total_page: 1,
     }
+    skuFilterValue.value = '__all__'
   }
   fetchCardSecrets(1)
 }
@@ -296,6 +385,10 @@ const handleBatchCreate = async () => {
     batchError.value = t('admin.cardSecrets.errors.productRequired')
     return
   }
+  if (selectedSkuRequired.value) {
+    batchError.value = t('admin.cardSecrets.errors.skuRequired')
+    return
+  }
   const secrets = batchForm.value.secrets
     .split(/\r?\n/)
     .map((item) => item.trim())
@@ -308,6 +401,7 @@ const handleBatchCreate = async () => {
   try {
     await adminAPI.createCardSecretBatch({
       product_id: productId,
+      sku_id: currentSkuId.value || undefined,
       secrets,
       batch_no: batchForm.value.batch_no.trim(),
       note: batchForm.value.note.trim(),
@@ -358,6 +452,10 @@ const handleImport = async () => {
     importError.value = t('admin.cardSecrets.errors.productRequired')
     return
   }
+  if (selectedSkuRequired.value) {
+    importError.value = t('admin.cardSecrets.errors.skuRequired')
+    return
+  }
   if (!importForm.value.file) {
     importError.value = t('admin.cardSecrets.errors.fileRequired')
     return
@@ -366,6 +464,9 @@ const handleImport = async () => {
   try {
     const formData = new FormData()
     formData.append('product_id', String(productId))
+    if (currentSkuId.value > 0) {
+      formData.append('sku_id', String(currentSkuId.value))
+    }
     formData.append('batch_no', importForm.value.batch_no.trim())
     formData.append('note', importForm.value.note.trim())
     formData.append('file', importForm.value.file)
@@ -401,6 +502,14 @@ const cardSecretStatusClass = (status: string) => {
       return 'text-muted-foreground border-border bg-muted/30'
   }
 }
+
+const batchSkuLabel = (batch: any) => {
+  return resolveSkuLabelById(Number(batch?.sku_id || 0))
+}
+
+const secretSkuLabel = (secret: any) => {
+  return resolveSkuLabelById(Number(secret?.sku_id || 0))
+}
 </script>
 
 <template>
@@ -410,8 +519,19 @@ const cardSecretStatusClass = (status: string) => {
     </div>
 
     <div class="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Input v-model="productIdInput" :placeholder="t('admin.cardSecrets.productPlaceholder')" @input="handleProductChange" />
+        <Select v-model="skuFilterValue" :disabled="skuFilterDisabled" @update:modelValue="refreshAll">
+          <SelectTrigger class="h-10">
+            <SelectValue :placeholder="t('admin.cardSecrets.skuPlaceholder')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">{{ t('admin.cardSecrets.skuAll') }}</SelectItem>
+            <SelectItem v-for="sku in availableSkus" :key="sku.id" :value="String(sku.id)">
+              {{ sku.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Button variant="outline" @click="refreshAll">{{ t('admin.common.refresh') }}</Button>
         <div class="text-xs text-muted-foreground flex flex-col gap-1">
           <span>{{ productIdHint }}</span>
@@ -421,6 +541,9 @@ const cardSecretStatusClass = (status: string) => {
               {{ productInfoName }}
             </a>
             <span v-else>{{ productInfoName }}</span>
+          </span>
+          <span v-if="currentProductId">
+            {{ t('admin.cardSecrets.skuLabel') }}：{{ currentSkuId ? resolveSkuLabelById(currentSkuId) : t('admin.cardSecrets.skuAll') }}
           </span>
         </div>
       </div>
@@ -522,6 +645,7 @@ const cardSecretStatusClass = (status: string) => {
             <TableRow>
               <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.table.batchNo') }}</TableHead>
               <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.table.source') }}</TableHead>
+              <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.table.sku') }}</TableHead>
               <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.table.count') }}</TableHead>
               <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.table.note') }}</TableHead>
               <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.table.createdAt') }}</TableHead>
@@ -529,14 +653,15 @@ const cardSecretStatusClass = (status: string) => {
           </TableHeader>
           <TableBody class="divide-y divide-border">
             <TableRow v-if="batchesLoading">
-              <TableCell colspan="5" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.common.loading') }}</TableCell>
+              <TableCell colspan="6" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.common.loading') }}</TableCell>
             </TableRow>
             <TableRow v-else-if="batches.length === 0">
-              <TableCell colspan="5" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.cardSecrets.emptyBatches') }}</TableCell>
+              <TableCell colspan="6" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.cardSecrets.emptyBatches') }}</TableCell>
             </TableRow>
             <TableRow v-for="batch in batches" :key="batch.id" class="hover:bg-muted/30">
               <TableCell class="px-4 py-3 font-medium text-foreground">{{ batch.batch_no || '-' }}</TableCell>
               <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ batch.source }}</TableCell>
+              <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ batchSkuLabel(batch) }}</TableCell>
               <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ batch.total_count }}</TableCell>
               <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ batch.note || '-' }}</TableCell>
               <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ formatDate(batch.created_at) }}</TableCell>
@@ -617,6 +742,7 @@ const cardSecretStatusClass = (status: string) => {
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.id') }}</TableHead>
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.secret') }}</TableHead>
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.product') }}</TableHead>
+            <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.sku') }}</TableHead>
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.status') }}</TableHead>
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.orderId') }}</TableHead>
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.batchId') }}</TableHead>
@@ -626,10 +752,10 @@ const cardSecretStatusClass = (status: string) => {
         </TableHeader>
         <TableBody class="divide-y divide-border">
           <TableRow v-if="cardSecretsLoading">
-            <TableCell colspan="8" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.common.loading') }}</TableCell>
+            <TableCell colspan="9" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.common.loading') }}</TableCell>
           </TableRow>
           <TableRow v-else-if="cardSecrets.length === 0">
-            <TableCell colspan="8" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.cardSecrets.emptyList') }}</TableCell>
+            <TableCell colspan="9" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.cardSecrets.emptyList') }}</TableCell>
           </TableRow>
           <TableRow v-for="secret in cardSecrets" :key="secret.id" class="hover:bg-muted/30">
             <TableCell class="px-4 py-3">
@@ -642,6 +768,7 @@ const cardSecretStatusClass = (status: string) => {
               </a>
               <span v-else class="text-muted-foreground">-</span>
             </TableCell>
+            <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ secretSkuLabel(secret) }}</TableCell>
             <TableCell class="px-4 py-3 text-xs">
               <span class="inline-flex rounded-full border px-2.5 py-1 text-xs" :class="cardSecretStatusClass(secret.status)">
                 {{ cardSecretStatusLabel(secret.status) }}

@@ -46,6 +46,41 @@ const pagination = reactive({
   total_page: 0,
 })
 
+type SKUFormItem = {
+  id: number
+  sku_code: string
+  spec_values: Record<string, string>
+  price_amount: number
+  manual_stock_total: number
+  is_active: boolean
+  sort_order: number
+}
+
+const createEmptyLocaleText = () => ({
+  'zh-CN': '',
+  'zh-TW': '',
+  'en-US': '',
+})
+
+const createSKUFormItem = (raw?: any): SKUFormItem => ({
+  id: Number(raw?.id || 0),
+  sku_code: String(raw?.sku_code || '').trim(),
+  spec_values: {
+    ...createEmptyLocaleText(),
+    ...Object.keys(raw?.spec_values || {}).reduce((result: Record<string, string>, key) => {
+      const text = String(raw?.spec_values?.[key] ?? '').trim()
+      if (text) {
+        result[key] = text
+      }
+      return result
+    }, {}),
+  },
+  price_amount: Number(raw?.price_amount || 0),
+  manual_stock_total: toSafeInt(raw?.manual_stock_total),
+  is_active: raw?.is_active ?? true,
+  sort_order: Number(raw?.sort_order || 0),
+})
+
 const form = reactive({
   id: 0,
   title: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' } as any,
@@ -59,6 +94,7 @@ const form = reactive({
   purchase_type: 'member',
   fulfillment_type: 'manual',
   manual_stock_total: 0,
+  skus: [] as SKUFormItem[],
   category_id: null as number | null,
   is_active: true,
   sort_order: 0,
@@ -121,12 +157,6 @@ const manualStockBadgeClass = (product: any) => {
   return 'border-emerald-200 bg-emerald-50 text-emerald-700'
 }
 
-const createEmptyLocaleText = () => ({
-  'zh-CN': '',
-  'zh-TW': '',
-  'en-US': '',
-})
-
 const createManualFormField = () => ({
   key: '',
   type: 'text',
@@ -159,6 +189,20 @@ const normalizeLocaleText = (value: any) => {
       result[code] = text
     }
   }
+  return result
+}
+
+const normalizeSpecValues = (value: any) => {
+  const result: Record<string, string> = {}
+  if (!value || typeof value !== 'object') {
+    return result
+  }
+  Object.keys(value).forEach((key) => {
+    const text = String(value[key] ?? '').trim()
+    if (text) {
+      result[key] = text
+    }
+  })
   return result
 }
 
@@ -257,6 +301,65 @@ const addManualFormField = () => {
 
 const removeManualFormField = (index: number) => {
   form.manual_form_schema.fields.splice(index, 1)
+}
+
+const addSKU = () => {
+  form.skus.push(
+    createSKUFormItem({
+      sku_code: `SKU-${form.skus.length + 1}`,
+      price_amount: Number(form.price_amount || 0),
+      manual_stock_total: toSafeInt(form.manual_stock_total),
+      is_active: true,
+      sort_order: form.skus.length,
+    })
+  )
+}
+
+const removeSKU = (index: number) => {
+  form.skus.splice(index, 1)
+}
+
+const normalizeSKUsForSubmit = () => {
+  if (!form.skus.length) {
+    return [] as Array<Record<string, any>>
+  }
+
+  const seenCode = new Set<string>()
+  const normalized = form.skus.map((item, index) => {
+    const skuCode = String(item.sku_code || '').trim()
+    if (!skuCode) {
+      throw new Error(t('admin.products.errors.skuCodeRequired', { index: index + 1 }))
+    }
+    const codeKey = skuCode.toLowerCase()
+    if (seenCode.has(codeKey)) {
+      throw new Error(t('admin.products.errors.skuCodeDuplicate', { code: skuCode }))
+    }
+    seenCode.add(codeKey)
+
+    const priceAmount = Number(item.price_amount)
+    if (!Number.isFinite(priceAmount) || priceAmount <= 0) {
+      throw new Error(t('admin.products.errors.skuPriceInvalid', { index: index + 1 }))
+    }
+
+    const isActive = Boolean(item.is_active)
+    const manualStockTotal = form.fulfillment_type === 'manual' ? toSafeInt(item.manual_stock_total) : 0
+    const specValues = normalizeSpecValues(item.spec_values)
+
+    return {
+      id: item.id > 0 ? item.id : undefined,
+      sku_code: skuCode,
+      spec_values: specValues,
+      price_amount: priceAmount,
+      manual_stock_total: manualStockTotal,
+      is_active: isActive,
+      sort_order: Number(item.sort_order) || 0,
+    }
+  })
+
+  if (!normalized.some((item) => item.is_active)) {
+    throw new Error(t('admin.products.errors.skuNeedActive'))
+  }
+  return normalized
 }
 
 const isTextLikeField = (fieldType: string) => {
@@ -375,6 +478,7 @@ const openEditModal = (product: any) => {
     purchase_type: product.purchase_type || 'member',
     fulfillment_type: product.fulfillment_type || 'manual',
     manual_stock_total: Number(product.manual_stock_total || 0),
+    skus: Array.isArray(product.skus) ? product.skus.map((item: any) => createSKUFormItem(item)) : [],
     category_id: Number(product.category_id || 0) || null,
     is_active: product.is_active ?? true,
     sort_order: Number(product.sort_order || 0),
@@ -401,6 +505,7 @@ const resetForm = () => {
     purchase_type: 'member',
     fulfillment_type: 'manual',
     manual_stock_total: 0,
+    skus: [],
     category_id: null,
     is_active: true,
     sort_order: 0,
@@ -411,6 +516,19 @@ const resetForm = () => {
 const handleSubmit = async () => {
   submitting.value = true
   try {
+    const normalizedSKUs = normalizeSKUsForSubmit()
+    const activeSKU = normalizedSKUs.find((item) => item.is_active)
+    let effectivePrice = Number(form.price_amount)
+    if (normalizedSKUs.length > 0) {
+      const priceSource = activeSKU || normalizedSKUs[0]!
+      effectivePrice = Number(priceSource.price_amount)
+    }
+    const effectiveManualStockTotal = normalizedSKUs.length
+      ? normalizedSKUs
+          .filter((item) => item.is_active)
+          .reduce((sum, item) => sum + toSafeInt(item.manual_stock_total), 0)
+      : toSafeInt(form.manual_stock_total)
+
     const payload = {
       slug: String(form.slug || '').trim(),
       category_id: Number(form.category_id),
@@ -418,12 +536,13 @@ const handleSubmit = async () => {
       title: form.title,
       description: form.description,
       content: form.content,
-      price_amount: Number(form.price_amount),
+      price_amount: effectivePrice,
       images: form.images,
       tags: form.tags,
       purchase_type: form.purchase_type,
       fulfillment_type: form.fulfillment_type,
-      manual_stock_total: toSafeInt(form.manual_stock_total),
+      manual_stock_total: effectiveManualStockTotal,
+      skus: normalizedSKUs,
       is_active: form.is_active,
       sort_order: Number(form.sort_order) || 0,
       manual_form_schema: normalizeManualFormSchemaForSubmit(),
@@ -653,7 +772,7 @@ watch(
             </TableCell>
             <TableCell class="px-6 py-4 text-right">
               <div class="flex items-center justify-end gap-2">
-                <Button size="sm" variant="outline" @click="openEditModal(product)">{{ t('admin.products.actions.edit') }}</Button>
+                <Button size="sm" variant="outline" @click="openEditById(product.id)">{{ t('admin.products.actions.edit') }}</Button>
                 <Button size="sm" variant="destructive" @click="handleDelete(product)">{{ t('admin.products.actions.delete') }}</Button>
               </div>
             </TableCell>
@@ -793,8 +912,17 @@ watch(
 
             <div class="col-span-1">
               <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.manualStockTotal') }}</label>
-              <Input v-model.number="form.manual_stock_total" type="number" min="0" :placeholder="t('admin.products.form.manualStockTotalPlaceholder')" />
-              <p class="mt-1 text-xs text-muted-foreground">{{ t('admin.products.form.manualStockTotalTip') }}</p>
+              <Input
+                v-model.number="form.manual_stock_total"
+                type="number"
+                min="0"
+                :placeholder="t('admin.products.form.manualStockTotalPlaceholder')"
+                :disabled="form.skus.length > 0"
+              />
+              <p v-if="form.skus.length > 0" class="mt-1 text-xs text-muted-foreground">
+                {{ t('admin.products.form.manualStockTotalSkuTip') }}
+              </p>
+              <p v-else class="mt-1 text-xs text-muted-foreground">{{ t('admin.products.form.manualStockTotalTip') }}</p>
             </div>
 
             <div v-if="form.fulfillment_type === 'manual'" class="col-span-2 rounded-xl border border-border bg-muted/20 p-4 space-y-4">
@@ -880,10 +1008,77 @@ watch(
               </div>
             </div>
 
+            <div class="col-span-2 rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold text-foreground">{{ t('admin.products.form.skuTitle') }}</h3>
+                  <p class="text-xs text-muted-foreground mt-1">{{ t('admin.products.form.skuTip') }}</p>
+                </div>
+                <Button type="button" size="sm" variant="outline" @click="addSKU">
+                  {{ t('admin.products.form.skuAdd') }}
+                </Button>
+              </div>
+
+              <div v-if="!form.skus.length" class="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">
+                {{ t('admin.products.form.skuEmpty') }}
+              </div>
+
+              <div v-for="(sku, index) in form.skus" :key="`sku-${index}-${sku.id || 0}`" class="rounded-lg border border-border bg-background p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="text-xs font-medium text-muted-foreground">{{ t('admin.products.form.skuItemTitle', { index: index + 1 }) }}</div>
+                  <Button type="button" size="sm" variant="destructive" @click="removeSKU(index)">
+                    {{ t('admin.products.form.skuRemove') }}
+                  </Button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                  <div class="md:col-span-1">
+                    <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.skuCode') }}</label>
+                    <Input v-model="sku.sku_code" :placeholder="t('admin.products.form.skuCodePlaceholder')" />
+                  </div>
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.skuSpec', { lang: getCurrentLangName() }) }}</label>
+                    <Input v-model="sku.spec_values[currentLang]" :placeholder="t('admin.products.form.skuSpecPlaceholder')" />
+                  </div>
+                  <div class="md:col-span-1">
+                    <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.skuPrice') }}</label>
+                    <Input v-model.number="sku.price_amount" type="number" step="0.01" min="0" :placeholder="t('admin.products.form.skuPricePlaceholder')" />
+                  </div>
+                  <div v-if="form.fulfillment_type === 'manual'" class="md:col-span-1">
+                    <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.skuManualStock') }}</label>
+                    <Input v-model.number="sku.manual_stock_total" type="number" min="0" :placeholder="t('admin.products.form.skuManualStockPlaceholder')" />
+                  </div>
+                  <div :class="form.fulfillment_type === 'manual' ? 'md:col-span-1' : 'md:col-span-2'" class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.skuSort') }}</label>
+                      <Input v-model.number="sku.sort_order" type="number" :placeholder="t('admin.products.form.skuSortPlaceholder')" />
+                    </div>
+                    <div class="flex items-end">
+                      <label class="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                        <input v-model="sku.is_active" type="checkbox" class="h-4 w-4 accent-primary" />
+                        {{ t('admin.products.form.skuActive') }}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="col-span-1">
               <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.priceAmount') }}</label>
-              <Input v-model.number="form.price_amount" type="number" step="0.01" min="0" required :placeholder="t('admin.products.form.priceAmountPlaceholder')" />
-              <p class="mt-1 text-xs text-muted-foreground">{{ t('admin.products.form.priceAmountTip') }}</p>
+              <Input
+                v-model.number="form.price_amount"
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                :placeholder="t('admin.products.form.priceAmountPlaceholder')"
+                :disabled="form.skus.length > 0"
+              />
+              <p v-if="form.skus.length > 0" class="mt-1 text-xs text-muted-foreground">
+                {{ t('admin.products.form.priceAmountSkuTip') }}
+              </p>
+              <p v-else class="mt-1 text-xs text-muted-foreground">{{ t('admin.products.form.priceAmountTip') }}</p>
             </div>
 
             <div class="col-span-1">
