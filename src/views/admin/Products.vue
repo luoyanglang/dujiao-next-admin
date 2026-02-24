@@ -131,6 +131,14 @@ const formatManualStockSummary = (product: any) => {
   return t('admin.products.stock.summary', { total, locked, sold, available })
 }
 
+const formatAutoStockSummary = (product: any) => {
+  const total = toSafeInt(product?.auto_stock_total)
+  const locked = toSafeInt(product?.auto_stock_locked)
+  const sold = toSafeInt(product?.auto_stock_sold)
+  const available = toSafeInt(product?.auto_stock_available)
+  return t('admin.products.stock.summary', { total, locked, sold, available })
+}
+
 const purchaseTypeBadgeClass = (product: any) => {
   return product?.purchase_type === 'guest'
     ? 'border-sky-200 bg-sky-50 text-sky-700'
@@ -151,6 +159,14 @@ const manualStockBadgeClass = (product: any) => {
   const locked = toSafeInt(product?.manual_stock_locked)
   const sold = toSafeInt(product?.manual_stock_sold)
   const available = Math.max(total - locked - sold, 0)
+  if (available <= 0) {
+    return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+}
+
+const autoStockBadgeClass = (product: any) => {
+  const available = toSafeInt(product?.auto_stock_available)
   if (available <= 0) {
     return 'border-rose-200 bg-rose-50 text-rose-700'
   }
@@ -743,6 +759,13 @@ watch(
                       :class="manualStockBadgeClass(product)"
                     >
                       {{ formatManualStockSummary(product) }}
+                    </span>
+                    <span
+                      v-if="product.fulfillment_type === 'auto'"
+                      class="rounded-full border px-2 py-0.5 text-[11px]"
+                      :class="autoStockBadgeClass(product)"
+                    >
+                      {{ formatAutoStockSummary(product) }}
                     </span>
                     <span
                       v-for="(tag, index) in (product.tags || []).slice(0, 3)"
