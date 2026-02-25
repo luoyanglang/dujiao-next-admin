@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { adminAPI } from '@/api/admin'
@@ -70,6 +70,61 @@ const discountTypeLabel = (type: string) => {
   }
   return map[type] || type
 }
+
+const promotionValueHint = computed(() => {
+  switch (String(form.type || '').trim()) {
+    case 'percent':
+      return t('admin.promotions.modal.valueHintPercent')
+    case 'fixed':
+      return t('admin.promotions.modal.valueHintFixed')
+    case 'special_price':
+      return t('admin.promotions.modal.valueHintSpecialPrice')
+    default:
+      return t('admin.promotions.modal.valueHintDefault')
+  }
+})
+
+const parsePriceNumber = (value: unknown) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) return null
+  return parsed
+}
+
+const selectedScopeProduct = computed(() => {
+  const id = Number(modalScopeValue.value)
+  if (!Number.isFinite(id) || id <= 0) return null
+  return productOptions.value.find((item: any) => Number(item?.id || 0) === Math.floor(id)) || null
+})
+
+const selectedScopeReferenceUnitPrice = computed(() => {
+  const product = selectedScopeProduct.value
+  if (!product) return null
+
+  const skuPrices: number[] = []
+  const skus = Array.isArray(product?.skus) ? product.skus : []
+  skus.forEach((sku: any) => {
+    if (sku?.is_active === false) return
+    const amount = parsePriceNumber(sku?.price_amount)
+    if (amount === null) return
+    skuPrices.push(amount)
+  })
+  if (skuPrices.length > 0) {
+    return Math.min(...skuPrices)
+  }
+  return parsePriceNumber(product?.price_amount)
+})
+
+const fixedDiscountRisk = computed(() => {
+  if (String(form.type || '').trim() !== 'fixed') return null
+  const discountValue = parsePriceNumber(form.value)
+  const referencePrice = selectedScopeReferenceUnitPrice.value
+  if (discountValue === null || referencePrice === null) return null
+  if (discountValue < referencePrice) return null
+  return {
+    discountValue: discountValue.toFixed(2),
+    referencePrice: referencePrice.toFixed(2),
+  }
+})
 
 const resetForm = () => {
   form.name = ''
@@ -538,6 +593,17 @@ watch(
             <div>
               <label class="mb-1.5 block text-xs font-medium text-muted-foreground">{{ t('admin.promotions.modal.value') }} *</label>
               <Input v-model.number="form.value" type="number" step="0.01" required placeholder="10" />
+              <p class="mt-1 text-[11px] leading-5 text-muted-foreground">{{ promotionValueHint }}</p>
+              <div
+                v-if="fixedDiscountRisk"
+                class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800"
+              >
+                <div class="font-medium">{{ t('admin.promotions.modal.riskHintTitle') }}</div>
+                <div class="mt-1">
+                  {{ t('admin.promotions.modal.riskHintFixedMayZero', { value: fixedDiscountRisk.discountValue, price: fixedDiscountRisk.referencePrice }) }}
+                </div>
+                <div class="mt-1">{{ t('admin.promotions.modal.riskHintReferencePrice') }}</div>
+              </div>
             </div>
             <div class="md:col-span-2">
               <label class="mb-1.5 block text-xs font-medium text-muted-foreground">{{ t('admin.promotions.modal.scope') }} *</label>
@@ -574,6 +640,7 @@ watch(
             <div>
               <label class="mb-1.5 block text-xs font-medium text-muted-foreground">{{ t('admin.promotions.modal.minAmount') }}</label>
               <Input v-model.number="form.min_amount" type="number" step="0.01" placeholder="0" />
+              <p class="mt-1 text-[11px] leading-5 text-muted-foreground">{{ t('admin.promotions.modal.minAmountHint') }}</p>
             </div>
             <div>
               <label class="mb-1.5 block text-xs font-medium text-muted-foreground">{{ t('admin.promotions.modal.startsAt') }}</label>
