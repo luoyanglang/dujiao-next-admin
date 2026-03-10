@@ -37,6 +37,7 @@ interface ChannelClient {
   channel_secret: string
   bot_token: string
   bot_token_set: boolean
+  callback_url?: string
   status: number
   description: string
   last_used_at: string | null
@@ -56,6 +57,7 @@ const editForm = ref({
   name: '',
   description: '',
   bot_token: '',
+  callback_url: '',
 })
 
 // Confirm dialogs
@@ -68,6 +70,7 @@ const createForm = ref({
   channel_type: 'telegram_bot',
   description: '',
   bot_token: '',
+  callback_url: '',
 })
 
 const fetchClients = async () => {
@@ -89,7 +92,7 @@ const handleCreate = async () => {
     await adminAPI.createChannelClient(createForm.value)
     notifySuccess(t('telegramBot.channelClients.createSuccess'))
     showCreateDialog.value = false
-    createForm.value = { name: '', channel_type: 'telegram_bot', description: '', bot_token: '' }
+    createForm.value = { name: '', channel_type: 'telegram_bot', description: '', bot_token: '', callback_url: '' }
     fetchClients()
   } catch {
     notifyError(t('telegramBot.channelClients.createFailed'))
@@ -104,6 +107,7 @@ const openEditDialog = (client: ChannelClient) => {
     name: client.name,
     description: client.description || '',
     bot_token: '',
+    callback_url: client.callback_url || '',
   }
   showEditDialog.value = true
 }
@@ -112,9 +116,10 @@ const handleEdit = async () => {
   if (!editingClient.value) return
   editing.value = true
   try {
-    const data: { name?: string; description?: string; bot_token?: string } = {
+    const data: { name?: string; description?: string; bot_token?: string; callback_url?: string } = {
       name: editForm.value.name,
       description: editForm.value.description,
+      callback_url: editForm.value.callback_url,
     }
     // 只有用户输入了 bot_token 才发送（空表示不修改）
     if (editForm.value.bot_token !== '') {
@@ -213,18 +218,19 @@ onMounted(() => {
               <TableHead>{{ t('telegramBot.channelClients.channelKey') }}</TableHead>
               <TableHead>{{ t('telegramBot.channelClients.channelSecret') }}</TableHead>
               <TableHead>Bot Token</TableHead>
+              <TableHead>{{ t('telegramBot.channelClients.callbackUrl') }}</TableHead>
               <TableHead>{{ t('telegramBot.channelClients.statusLabel') }}</TableHead>
               <TableHead>{{ t('telegramBot.channelClients.actions') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow v-if="loading">
-              <TableCell :colspan="7" class="text-center py-8 text-muted-foreground">
+              <TableCell :colspan="8" class="text-center py-8 text-muted-foreground">
                 <Loader2 class="h-5 w-5 animate-spin mx-auto" />
               </TableCell>
             </TableRow>
             <TableRow v-else-if="clients.length === 0">
-              <TableCell :colspan="7" class="text-center py-8 text-muted-foreground">
+              <TableCell :colspan="8" class="text-center py-8 text-muted-foreground">
                 {{ t('telegramBot.channelClients.empty') }}
               </TableCell>
             </TableRow>
@@ -257,6 +263,15 @@ onMounted(() => {
                   {{ t('telegramBot.channelClients.botTokenSet') }}
                 </Badge>
                 <span v-else class="text-xs text-muted-foreground">{{ t('telegramBot.channelClients.botTokenNotSet') }}</span>
+              </TableCell>
+              <TableCell>
+                <div v-if="client.callback_url" class="flex items-center gap-1">
+                  <code class="text-xs bg-muted px-1.5 py-0.5 rounded max-w-[220px] truncate block">{{ client.callback_url }}</code>
+                  <Button variant="ghost" size="sm" class="h-6 w-6 p-0 shrink-0" @click="copyToClipboard(client.callback_url)">
+                    <Copy class="h-3 w-3" />
+                  </Button>
+                </div>
+                <span v-else class="text-xs text-muted-foreground">{{ t('telegramBot.channelClients.callbackUrlNotSet') }}</span>
               </TableCell>
               <TableCell>
                 <Badge :variant="client.status === 1 ? 'default' : 'secondary'">
@@ -303,6 +318,11 @@ onMounted(() => {
             <p class="text-xs text-muted-foreground">{{ t('telegramBot.channelClients.botTokenHint') }}</p>
           </div>
           <div class="space-y-2">
+            <Label>{{ t('telegramBot.channelClients.callbackUrl') }}</Label>
+            <Input v-model="createForm.callback_url" :placeholder="t('telegramBot.channelClients.callbackUrlPlaceholder')" />
+            <p class="text-xs text-muted-foreground">{{ t('telegramBot.channelClients.callbackUrlHint') }}</p>
+          </div>
+          <div class="space-y-2">
             <Label>{{ t('telegramBot.channelClients.description') }}</Label>
             <Textarea v-model="createForm.description" :placeholder="t('telegramBot.channelClients.descriptionPlaceholder')" rows="2" />
           </div>
@@ -340,6 +360,11 @@ onMounted(() => {
                 {{ t('telegramBot.channelClients.botTokenCurrentNotSet') }}
               </template>
             </p>
+          </div>
+          <div class="space-y-2">
+            <Label>{{ t('telegramBot.channelClients.callbackUrl') }}</Label>
+            <Input v-model="editForm.callback_url" :placeholder="t('telegramBot.channelClients.callbackUrlPlaceholder')" />
+            <p class="text-xs text-muted-foreground">{{ t('telegramBot.channelClients.callbackUrlHint') }}</p>
           </div>
           <div class="space-y-2">
             <Label>{{ t('telegramBot.channelClients.description') }}</Label>

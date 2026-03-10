@@ -398,9 +398,9 @@ export const adminAPI = {
 
   // Channel Clients (Bot Clients)
   getChannelClients: () => api.get<ApiResponse>('/admin/channel-clients'),
-  createChannelClient: (data: { name: string; channel_type: string; description?: string; bot_token?: string }) => api.post<ApiResponse>('/admin/channel-clients', data),
+  createChannelClient: (data: { name: string; channel_type: string; description?: string; bot_token?: string; callback_url?: string }) => api.post<ApiResponse>('/admin/channel-clients', data),
   getChannelClient: (id: number) => api.get<ApiResponse>(`/admin/channel-clients/${id}`),
-  updateChannelClient: (id: number, data: { name?: string; description?: string; bot_token?: string }) => api.put<ApiResponse>(`/admin/channel-clients/${id}`, data),
+  updateChannelClient: (id: number, data: { name?: string; description?: string; bot_token?: string; callback_url?: string }) => api.put<ApiResponse>(`/admin/channel-clients/${id}`, data),
   updateChannelClientStatus: (id: number, data: { status: number }) => api.put<ApiResponse>(`/admin/channel-clients/${id}/status`, data),
   resetChannelClientSecret: (id: number) => api.post<ApiResponse>(`/admin/channel-clients/${id}/reset-secret`),
   deleteChannelClient: (id: number) => api.delete<ApiResponse>(`/admin/channel-clients/${id}`),

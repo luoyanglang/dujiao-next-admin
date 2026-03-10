@@ -55,6 +55,7 @@ const languages = computed(() => [
 const form = ref({
   enabled: false,
   default_locale: 'zh-CN',
+  max_purchase_quantity: 10,
   basic: {
     display_name: '',
     description: emptyLocalized(),
@@ -91,6 +92,7 @@ const fetchConfig = async () => {
     if (data) {
       form.value.enabled = (data.enabled as boolean) ?? false
       form.value.default_locale = (data.default_locale as string) ?? 'zh-CN'
+      form.value.max_purchase_quantity = Number(data.max_purchase_quantity ?? 10) || 10
 
       const basic = data.basic as Record<string, unknown> | undefined
       if (basic) {
@@ -121,7 +123,12 @@ const fetchConfig = async () => {
 const handleSave = async () => {
   saving.value = true
   try {
-    await adminAPI.updateTelegramBotSettings(form.value)
+    const normalizedMaxPurchaseQuantity = Math.max(1, Number(form.value.max_purchase_quantity) || 1)
+    await adminAPI.updateTelegramBotSettings({
+      ...form.value,
+      max_purchase_quantity: normalizedMaxPurchaseQuantity,
+    })
+    form.value.max_purchase_quantity = normalizedMaxPurchaseQuantity
     notifySuccess(t('telegramBot.settings.saveSuccess'))
   } catch {
     notifyError(t('telegramBot.settings.saveFailed'))
@@ -240,6 +247,17 @@ onMounted(() => {
                 <SelectItem value="en-US">English</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div class="space-y-2">
+            <Label>{{ t('telegramBot.settings.maxPurchaseQuantity') }}</Label>
+            <Input
+              v-model.number="form.max_purchase_quantity"
+              type="number"
+              min="1"
+              step="1"
+              :placeholder="t('telegramBot.settings.maxPurchaseQuantityPlaceholder')"
+            />
+            <p class="text-xs text-muted-foreground">{{ t('telegramBot.settings.maxPurchaseQuantityHint') }}</p>
           </div>
         </div>
       </CardContent>
