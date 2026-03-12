@@ -203,6 +203,18 @@ const routes = [
         meta: { permission: 'GET:/admin/settings/telegram-bot' },
       },
       {
+        path: 'telegram-bot/help-center',
+        name: 'telegram-bot-help-center',
+        component: () => import('@/views/admin/TelegramBotHelpCenter.vue'),
+        meta: { permission: 'GET:/admin/settings/telegram-bot' },
+      },
+      {
+        path: 'telegram-bot/menu',
+        name: 'telegram-bot-menu-settings',
+        component: () => import('@/views/admin/TelegramBotMenuSettings.vue'),
+        meta: { permission: 'GET:/admin/settings/telegram-bot' },
+      },
+      {
         path: 'telegram-bot/status',
         name: 'telegram-bot-status',
         component: () => import('@/views/admin/TelegramBotStatus.vue'),
