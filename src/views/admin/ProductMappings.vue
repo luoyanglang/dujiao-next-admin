@@ -280,10 +280,13 @@ const getSkuPriceRange = (product: UpstreamProduct) => {
   return min === max ? `${min}` : `${min} ~ ${max}`
 }
 
+const isSkuAvailable = (status: string) =>
+  status === 'in_stock' || status === 'low_stock' || status === 'unlimited'
+
 const getSkuStockSummary = (product: UpstreamProduct) => {
   if (!product.skus || product.skus.length === 0) return '-'
   const total = product.skus.length
-  const inStock = product.skus.filter((s) => s.stock_status === 'in_stock').length
+  const inStock = product.skus.filter((s) => isSkuAvailable(s.stock_status)).length
   if (inStock === total) return t('productMappings.import.stockAllInStock')
   if (inStock === 0) return t('productMappings.import.stockAllOutOfStock')
   return t('productMappings.import.stockPartial', { inStock, total })
@@ -292,7 +295,7 @@ const getSkuStockSummary = (product: UpstreamProduct) => {
 const getSkuStockClass = (product: UpstreamProduct) => {
   if (!product.skus || product.skus.length === 0) return 'text-muted-foreground'
   const total = product.skus.length
-  const inStock = product.skus.filter((s) => s.stock_status === 'in_stock').length
+  const inStock = product.skus.filter((s) => isSkuAvailable(s.stock_status)).length
   if (inStock === total) return 'text-emerald-600'
   if (inStock === 0) return 'text-red-500'
   return 'text-amber-600'
@@ -656,8 +659,8 @@ onMounted(() => { fetchConnections(); fetchCategories(); fetchMappings() })
                           </div>
                           <div class="py-1.5 text-right font-mono text-foreground">{{ sku.price_amount }}<span v-if="product.currency" class="text-muted-foreground ml-0.5">{{ product.currency }}</span></div>
                           <div class="py-1.5 text-center">
-                            <span class="inline-flex rounded-full px-1.5 py-0.5 text-[10px]" :class="sku.stock_status === 'in_stock' ? 'text-emerald-700 bg-emerald-50' : 'text-red-600 bg-red-50'">
-                              {{ sku.stock_status === 'in_stock' ? t('productMappings.import.inStock') : t('productMappings.import.outOfStock') }}
+                            <span class="inline-flex rounded-full px-1.5 py-0.5 text-[10px]" :class="isSkuAvailable(sku.stock_status) ? 'text-emerald-700 bg-emerald-50' : 'text-red-600 bg-red-50'">
+                              {{ isSkuAvailable(sku.stock_status) ? t('productMappings.import.inStock') : t('productMappings.import.outOfStock') }}
                             </span>
                           </div>
                           <div class="py-1.5 text-center"><span class="inline-block h-2 w-2 rounded-full" :class="sku.is_active ? 'bg-emerald-500' : 'bg-gray-300'" /></div>
