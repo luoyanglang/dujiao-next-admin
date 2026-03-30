@@ -157,24 +157,64 @@ const formatManualValue = (value: unknown) => {
   return String(value)
 }
 
-const manualSubmissionRows = (submission: Record<string, unknown> | null | undefined, schemaSnapshot?: Record<string, unknown> | null) => {
+type ManualFormSnapshotField = {
+  key: string
+  label?: Record<string, unknown> | string
+}
+
+const normalizeManualSnapshotFields = (schemaSnapshot: Record<string, unknown> | null | undefined): ManualFormSnapshotField[] => {
+  if (!schemaSnapshot || typeof schemaSnapshot !== 'object') return []
+  const rawFields = Array.isArray(schemaSnapshot.fields) ? schemaSnapshot.fields : []
+  return rawFields
+    .map((field) => {
+      if (!field || typeof field !== 'object') return null
+      const key = String((field as Record<string, unknown>).key || '').trim()
+      if (!key) return null
+      return {
+        key,
+        label: (field as Record<string, unknown>).label as Record<string, unknown> | string | undefined,
+      } satisfies ManualFormSnapshotField
+    })
+    .filter(Boolean) as ManualFormSnapshotField[]
+}
+
+const resolveManualFieldLabel = (field: ManualFormSnapshotField) => {
+  const localized = getLocalizedText(field.label)
+  if (localized) return String(localized)
+  return field.key
+}
+
+const manualSubmissionRows = (
+  submission: Record<string, unknown> | null | undefined,
+  schemaSnapshot?: Record<string, unknown> | null
+) => {
   if (!submission || typeof submission !== 'object') return []
-  const fields = Array.isArray(schemaSnapshot?.fields) ? (schemaSnapshot!.fields as Record<string, unknown>[]) : []
-  const labelMap = new Map<string, string>()
-  for (const field of fields) {
-    const fieldKey = String(field?.key || '').trim()
-    if (fieldKey) {
-      const label = getLocalizedText(field?.label as Record<string, string> | undefined)
-      if (label) labelMap.set(fieldKey, label)
-    }
-  }
-  return Object.entries(submission)
-    .filter(([key]) => String(key).trim() !== '')
-    .map(([key, value]) => ({
-      key: String(key),
-      label: labelMap.get(String(key)) || String(key),
+
+  const entries = Object.entries(submission).filter(([key]) => String(key).trim() !== '')
+  if (entries.length === 0) return []
+
+  const valueMap = new Map(entries.map(([key, value]) => [String(key), value] as const))
+  const rows: Array<{ key: string; label: string; value: string }> = []
+
+  normalizeManualSnapshotFields(schemaSnapshot).forEach((field) => {
+    if (!valueMap.has(field.key)) return
+    rows.push({
+      key: field.key,
+      label: resolveManualFieldLabel(field),
+      value: formatManualValue(valueMap.get(field.key)),
+    })
+    valueMap.delete(field.key)
+  })
+
+  valueMap.forEach((value, key) => {
+    rows.push({
+      key,
+      label: key,
       value: formatManualValue(value),
-    }))
+    })
+  })
+
+  return rows
 }
 
 const parseOrderItemSkuId = (item: AdminOrderItem & Record<string, unknown>) => {
