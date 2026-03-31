@@ -1647,6 +1647,7 @@ const messages = {
           memberLevel: '会员等级',
           createdAt: '注册时间',
           lastLoginAt: '最后登录',
+          adminNote: '管理员备注',
           action: '操作',
         },
         empty: '暂无用户',
@@ -1671,6 +1672,8 @@ const messages = {
           passwordTip: '留空则不修改密码',
           locale: '语言',
           status: '状态',
+          adminNote: '管理员备注',
+          adminNotePlaceholder: '输入管理员备注（仅后台可见）',
         },
         errors: {
           updateFailed: '更新用户失败',
@@ -1738,6 +1741,7 @@ const messages = {
           memberLevel: '会员等级',
           createdAt: '注册时间',
           lastLoginAt: '最后登录',
+          adminNote: '管理员备注',
         },
         oauth: {
           title: '第三方关联账号',
@@ -4531,6 +4535,7 @@ const messages = {
           memberLevel: '會員等級',
           createdAt: '註冊時間',
           lastLoginAt: '最後登入',
+          adminNote: '管理員備註',
           action: '操作',
         },
         empty: '暫無用戶',
@@ -4555,6 +4560,8 @@ const messages = {
           passwordTip: '留空則不修改密碼',
           locale: '語言',
           status: '狀態',
+          adminNote: '管理員備註',
+          adminNotePlaceholder: '輸入管理員備註（僅後台可見）',
         },
         errors: {
           updateFailed: '更新用戶失敗',
@@ -4622,6 +4629,7 @@ const messages = {
           memberLevel: '會員等級',
           createdAt: '註冊時間',
           lastLoginAt: '最後登入',
+          adminNote: '管理員備註',
         },
         oauth: {
           title: '第三方關聯帳號',
@@ -7415,6 +7423,7 @@ const messages = {
           memberLevel: 'Member Level',
           createdAt: 'Registered',
           lastLoginAt: 'Last Login',
+          adminNote: 'Admin Note',
           action: 'Action',
         },
         empty: 'No users',
@@ -7439,6 +7448,8 @@ const messages = {
           passwordTip: 'Leave blank to keep password',
           locale: 'Locale',
           status: 'Status',
+          adminNote: 'Admin Note',
+          adminNotePlaceholder: 'Enter admin note (visible to admins only)',
         },
         errors: {
           updateFailed: 'Failed to update user',
@@ -7506,6 +7517,7 @@ const messages = {
           memberLevel: 'Member Level',
           createdAt: 'Registered',
           lastLoginAt: 'Last login',
+          adminNote: 'Admin Note',
         },
         oauth: {
           title: 'Linked third-party accounts',

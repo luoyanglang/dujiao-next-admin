@@ -435,6 +435,7 @@ export interface AdminUser {
   total_recharged?: number | string
   total_spent?: number | string
   wallet_balance?: number | string
+  admin_note?: string
   email_verified_at?: string
   last_login_at?: string
   created_at: string
