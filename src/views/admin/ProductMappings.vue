@@ -13,7 +13,7 @@ import { getLocalizedText } from '@/utils/format'
 import { buildAdminCategoryPath, createAdminCategoryChildCountMap, createAdminCategoryMap, flattenAdminCategories, isAdminProductCategorySelectable } from '@/utils/category'
 import TableSkeleton from '@/components/TableSkeleton.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const loading = ref(true)
 const mappings = ref<(AdminProductMapping & { product?: AdminProduct })[]>([])
 const connections = ref<AdminSiteConnection[]>([])
@@ -131,15 +131,7 @@ const getCategoryOptionName = (category: AdminCategory) => {
   return getLocalizedText(category.name)
 }
 
-const getCategoryLeafTip = () => {
-  if (locale.value === 'en-US') {
-    return 'Root categories with child categories cannot receive products directly. Prefer a leaf category.'
-  }
-  if (locale.value === 'zh-TW') {
-    return '已有二級分類的一級分類不能直接掛商品，請優先選擇末級分類'
-  }
-  return '已有二级分类的一级分类不能直接挂商品，请优先选择末级分类'
-}
+
 
 // --- Detail expand ---
 

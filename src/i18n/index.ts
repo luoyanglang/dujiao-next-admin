@@ -55,7 +55,8 @@ const messages = {
       columns: {
         id: 'ID',
         connection: '连接',
-        localOrderNo: '本地订单号',
+        localOrderNo: '本地订单号（子）',
+        parentOrderNo: '父订单号',
         upstreamOrderNo: '上游订单号',
         status: '状态',
         upstreamAmount: '上游金额',
@@ -3039,7 +3040,8 @@ const messages = {
       columns: {
         id: 'ID',
         connection: '連接',
-        localOrderNo: '本地訂單號',
+        localOrderNo: '本地訂單號（子）',
+        parentOrderNo: '父訂單號',
         upstreamOrderNo: '上游訂單號',
         status: '狀態',
         upstreamAmount: '上游金額',
@@ -6023,7 +6025,8 @@ const messages = {
       columns: {
         id: 'ID',
         connection: 'Connection',
-        localOrderNo: 'Local Order No',
+        localOrderNo: 'Local Order No (child)',
+        parentOrderNo: 'Parent Order No',
         upstreamOrderNo: 'Upstream Order No',
         status: 'Status',
         upstreamAmount: 'Upstream Amount',
