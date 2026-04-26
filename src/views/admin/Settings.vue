@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { notifyError, notifySuccess } from '@/utils/notify'
 import SettingsSMTPTab from './components/SettingsSMTPTab.vue'
 import SettingsCaptchaTab from './components/SettingsCaptchaTab.vue'
@@ -952,15 +953,15 @@ onMounted(() => {
           </div>
         </div>
         <div class="px-6 py-6 space-y-6">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <RadioGroup v-model="form.template_mode" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Card Mode -->
-            <label
+            <Label
               class="relative flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 p-6 transition-all"
               :class="form.template_mode === 'card'
                 ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                 : 'border-border hover:border-muted-foreground/30'"
             >
-              <input type="radio" v-model="form.template_mode" value="card" class="sr-only" />
+              <RadioGroupItem value="card" class="sr-only" />
               <div class="flex h-16 w-16 items-center justify-center rounded-xl" :class="form.template_mode === 'card' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'">
                 <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                   <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -978,16 +979,16 @@ onMounted(() => {
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
               </div>
-            </label>
+            </Label>
 
             <!-- List Mode -->
-            <label
+            <Label
               class="relative flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 p-6 transition-all"
               :class="form.template_mode === 'list'
                 ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                 : 'border-border hover:border-muted-foreground/30'"
             >
-              <input type="radio" v-model="form.template_mode" value="list" class="sr-only" />
+              <RadioGroupItem value="list" class="sr-only" />
               <div class="flex h-16 w-16 items-center justify-center rounded-xl" :class="form.template_mode === 'list' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'">
                 <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                   <path stroke-linecap="round" d="M3 6h18M3 12h18M3 18h18" />
@@ -1005,8 +1006,8 @@ onMounted(() => {
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
               </div>
-            </label>
-          </div>
+            </Label>
+          </RadioGroup>
         </div>
       </div>
       </TabsContent>
