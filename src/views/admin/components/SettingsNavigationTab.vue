@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { notifyError, notifySuccess } from '@/utils/notify'
 
 const { t } = useI18n()
@@ -252,10 +253,15 @@ defineExpose({ save, submitting })
               <label class="mb-1 block text-xs font-medium text-muted-foreground">
                 {{ t('admin.settings.navigation.custom.fields.linkType') }}
               </label>
-              <select v-model="item.link_type" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                <option value="internal">{{ t('admin.settings.navigation.custom.fields.linkTypeInternal') }}</option>
-                <option value="external">{{ t('admin.settings.navigation.custom.fields.linkTypeExternal') }}</option>
-              </select>
+              <Select v-model="item.link_type">
+                <SelectTrigger class="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="internal">{{ t('admin.settings.navigation.custom.fields.linkTypeInternal') }}</SelectItem>
+                  <SelectItem value="external">{{ t('admin.settings.navigation.custom.fields.linkTypeExternal') }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <!-- URL -->
@@ -274,10 +280,15 @@ defineExpose({ save, submitting })
               <label class="mb-1 block text-xs font-medium text-muted-foreground">
                 {{ t('admin.settings.navigation.custom.fields.target') }}
               </label>
-              <select v-model="item.target" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                <option value="_self">{{ t('admin.settings.navigation.custom.fields.targetSelf') }}</option>
-                <option value="_blank">{{ t('admin.settings.navigation.custom.fields.targetBlank') }}</option>
-              </select>
+              <Select v-model="item.target">
+                <SelectTrigger class="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_self">{{ t('admin.settings.navigation.custom.fields.targetSelf') }}</SelectItem>
+                  <SelectItem value="_blank">{{ t('admin.settings.navigation.custom.fields.targetBlank') }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <!-- 排序 -->

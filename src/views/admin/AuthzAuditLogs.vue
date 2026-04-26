@@ -143,10 +143,10 @@ const pagination = ref({
 const filters = reactive({
   operator_admin_id: '',
   target_admin_id: '',
-  action: '',
+  action: '__all__',
   role: '',
   object: '',
-  method: '',
+  method: '__all__',
   created_from: '',
   created_to: '',
 })
@@ -169,10 +169,10 @@ const fetchLogs = async (page = 1) => {
       page_size: pagination.value.page_size,
       operator_admin_id: filters.operator_admin_id || undefined,
       target_admin_id: filters.target_admin_id || undefined,
-      action: filters.action || undefined,
+      action: filters.action !== '__all__' ? filters.action || undefined : undefined,
       role: filters.role || undefined,
       object: filters.object || undefined,
-      method: filters.method || undefined,
+      method: filters.method !== '__all__' ? filters.method || undefined : undefined,
       created_from: toRFC3339(filters.created_from),
       created_to: toRFC3339(filters.created_to),
     })
@@ -194,10 +194,10 @@ const debouncedSearch = useDebounceFn(handleSearch, 300)
 const handleReset = () => {
   filters.operator_admin_id = ''
   filters.target_admin_id = ''
-  filters.action = ''
+  filters.action = '__all__'
   filters.role = ''
   filters.object = ''
-  filters.method = ''
+  filters.method = '__all__'
   filters.created_from = ''
   filters.created_to = ''
   fetchLogs(1)
@@ -229,7 +229,7 @@ onMounted(() => {
             <SelectValue :placeholder="text.filters.allActions" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{{ text.filters.allActions }}</SelectItem>
+            <SelectItem value="__all__">{{ text.filters.allActions }}</SelectItem>
             <SelectItem v-for="item in actionOptions" :key="item" :value="item">{{ item }}</SelectItem>
           </SelectContent>
         </Select>
@@ -243,7 +243,7 @@ onMounted(() => {
             <SelectValue :placeholder="text.filters.allMethods" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{{ text.filters.allMethods }}</SelectItem>
+            <SelectItem value="__all__">{{ text.filters.allMethods }}</SelectItem>
             <SelectItem v-for="item in methodOptions" :key="item" :value="item">{{ item }}</SelectItem>
           </SelectContent>
         </Select>

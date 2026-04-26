@@ -838,9 +838,14 @@ watch(
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('admin.products.form.manualFormFieldType') }}</label>
-                  <select v-model="field.type" :disabled="editingIsMapped" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                    <option v-for="typeItem in manualFieldTypeOptions" :key="typeItem.value" :value="typeItem.value">{{ typeItem.label }}</option>
-                  </select>
+                  <Select v-model="field.type" :disabled="editingIsMapped">
+                    <SelectTrigger class="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="typeItem in manualFieldTypeOptions" :key="typeItem.value" :value="typeItem.value">{{ typeItem.label }}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div class="flex items-end">
                   <label class="inline-flex items-center gap-2 text-sm text-muted-foreground">

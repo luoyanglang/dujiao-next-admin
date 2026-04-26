@@ -3,6 +3,7 @@ import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { notifyError, notifySuccess } from '@/utils/notify'
 
 const { t } = useI18n()
@@ -157,14 +158,16 @@ defineExpose({ save, submitting })
       <div class="space-y-6 p-6">
         <div class="space-y-2">
           <label class="text-xs font-medium text-muted-foreground">{{ t('admin.settings.captcha.provider') }}</label>
-          <select
-            v-model="form.provider"
-            class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="none">{{ t('admin.settings.captcha.providerNone') }}</option>
-            <option value="image">{{ t('admin.settings.captcha.providerImage') }}</option>
-            <option value="turnstile">{{ t('admin.settings.captcha.providerTurnstile') }}</option>
-          </select>
+          <Select v-model="form.provider">
+            <SelectTrigger class="h-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{{ t('admin.settings.captcha.providerNone') }}</SelectItem>
+              <SelectItem value="image">{{ t('admin.settings.captcha.providerImage') }}</SelectItem>
+              <SelectItem value="turnstile">{{ t('admin.settings.captcha.providerTurnstile') }}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div class="rounded-xl border border-border bg-muted/20 p-4">

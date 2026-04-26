@@ -283,11 +283,16 @@ defineExpose({ save, submitting })
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div class="space-y-2">
             <label class="text-xs font-medium text-muted-foreground">{{ t('admin.settings.notification.defaultLocale') }}</label>
-            <select v-model="form.default_locale" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-              <option value="zh-CN">{{ t('admin.common.lang.zhCN') }}</option>
-              <option value="zh-TW">{{ t('admin.common.lang.zhTW') }}</option>
-              <option value="en-US">{{ t('admin.common.lang.enUS') }}</option>
-            </select>
+            <Select v-model="form.default_locale">
+              <SelectTrigger class="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="zh-CN">{{ t('admin.common.lang.zhCN') }}</SelectItem>
+                <SelectItem value="zh-TW">{{ t('admin.common.lang.zhTW') }}</SelectItem>
+                <SelectItem value="en-US">{{ t('admin.common.lang.enUS') }}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div class="space-y-2">
             <label class="text-xs font-medium text-muted-foreground">{{ t('admin.settings.notification.dedupeTTLSeconds') }}</label>
