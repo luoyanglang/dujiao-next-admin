@@ -12,6 +12,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { notifyError, notifySuccess } from '@/utils/notify'
+import { applySiteIcon } from '@/utils/favicon'
+import { getImageUrl } from '@/utils/image'
+import MediaPicker from '@/components/admin/MediaPicker.vue'
 import SettingsSMTPTab from './components/SettingsSMTPTab.vue'
 import SettingsCaptchaTab from './components/SettingsCaptchaTab.vue'
 import SettingsOrderEmailTemplateTab from './components/SettingsOrderEmailTemplateTab.vue'
@@ -23,6 +26,7 @@ const smtpTabRef = ref<InstanceType<typeof SettingsSMTPTab>>()
 const captchaTabRef = ref<InstanceType<typeof SettingsCaptchaTab>>()
 const orderEmailTemplateTabRef = ref<InstanceType<typeof SettingsOrderEmailTemplateTab>>()
 const navigationTabRef = ref<InstanceType<typeof SettingsNavigationTab>>()
+const siteIconPickerRef = ref<InstanceType<typeof MediaPicker> | null>(null)
 const supportedLanguages = ['zh-CN', 'zh-TW', 'en-US'] as const
 type SupportedLanguage = (typeof supportedLanguages)[number]
 type SiteScriptPosition = 'head' | 'body_end'
@@ -166,6 +170,7 @@ const form = reactive({
   brand: {
     site_name: '',
     site_url: '',
+    site_icon: '',
     site_description: createLocalizedField(),
   },
   currency: 'CNY',
@@ -338,6 +343,7 @@ const fetchSettings = async () => {
       if (brand) {
         form.brand.site_name = String(brand.site_name || '')
         form.brand.site_url = String(brand.site_url || '')
+        form.brand.site_icon = String(brand.site_icon || '')
         form.brand.site_description = normalizeLocalizedField(brand.site_description)
       }
       {
@@ -549,6 +555,15 @@ const saveSiteSettings = async () => {
     },
   }
   await adminAPI.updateSettings(payload)
+  applySiteIcon(form.brand.site_icon)
+}
+
+const openSiteIconPicker = () => {
+  siteIconPickerRef.value?.openPicker()
+}
+
+const clearSiteIcon = () => {
+  form.brand.site_icon = ''
 }
 
 const saveOrderSettings = async () => {
@@ -801,6 +816,28 @@ onMounted(() => {
           <div class="space-y-2">
             <label class="text-xs font-medium text-muted-foreground">{{ t('admin.settings.brand.siteUrl') }}</label>
             <Input v-model="form.brand.site_url" :placeholder="t('admin.settings.brand.siteUrlPlaceholder')" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-xs font-medium text-muted-foreground">{{ t('admin.settings.brand.siteIcon') }}</label>
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/20 transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :title="t('admin.settings.brand.siteIconTip')"
+                @click="openSiteIconPicker"
+              >
+                <img v-if="form.brand.site_icon" :src="getImageUrl(form.brand.site_icon)" class="h-full w-full object-contain" alt="" />
+                <span v-else class="text-[10px] font-semibold text-muted-foreground">ICO</span>
+              </button>
+              <Button type="button" variant="outline" size="sm" @click="openSiteIconPicker">
+                {{ t('admin.settings.brand.siteIconSelect') }}
+              </Button>
+              <Button v-if="form.brand.site_icon" type="button" variant="ghost" size="sm" @click="clearSiteIcon">
+                {{ t('admin.common.delete') }}
+              </Button>
+            </div>
+            <p class="text-xs text-muted-foreground">{{ t('admin.settings.brand.siteIconTip') }}</p>
+            <MediaPicker ref="siteIconPickerRef" v-model="form.brand.site_icon" scene="common" dialog-only />
           </div>
           <div class="space-y-2 md:col-span-2">
             <div class="flex items-center justify-between">
