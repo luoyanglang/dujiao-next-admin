@@ -323,7 +323,7 @@ watch(
           <TableRow v-else-if="posts.length === 0">
             <TableCell colspan="6" class="px-6 py-8 text-center text-muted-foreground">{{ t('admin.posts.empty') }}</TableCell>
           </TableRow>
-          <TableRow v-for="post in posts" :key="post.id" class="hover:bg-muted/30 group">
+          <TableRow v-for="post in posts" :key="post.id" class="hover:bg-muted/30">
             <TableCell class="px-6 py-4">
               <IdCell :value="post.id" />
             </TableCell>
@@ -349,7 +349,7 @@ watch(
             </TableCell>
             <TableCell class="min-w-[180px] px-6 py-4 text-xs text-muted-foreground">{{ formatDate(post.created_at) }}</TableCell>
             <TableCell class="min-w-[140px] px-6 py-4 text-right">
-              <div class="flex items-center justify-end gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+              <div class="flex items-center justify-end gap-2">
                 <Button size="icon-sm" variant="outline" @click="openEditModal(post)">
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
