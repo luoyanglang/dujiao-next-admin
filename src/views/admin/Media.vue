@@ -12,6 +12,7 @@ import { getImageUrl } from '@/utils/image'
 import { notifyError, notifySuccess } from '@/utils/notify'
 import { confirmAction } from '@/utils/confirm'
 import FileInput from '@/components/FileInput.vue'
+import { DEFAULT_UPLOAD_MAX_SIZE_BYTES, formatFileSizeLimit, splitFilesBySize } from '@/utils/upload'
 
 const { t } = useI18n()
 const loading = ref(false)
@@ -95,12 +96,20 @@ function formatFileSize(bytes: number): string {
 // Upload
 async function handleFileChange(files: FileList | null) {
   if (!files || files.length === 0) return
+  const { accepted: fileList, rejected } = splitFilesBySize(Array.from(files))
+  if (rejected.length > 0) {
+    notifyError(t('admin.media.errors.fileTooLarge', {
+      count: rejected.length,
+      max: formatFileSizeLimit(DEFAULT_UPLOAD_MAX_SIZE_BYTES),
+    }))
+  }
+  if (fileList.length === 0) return
+
   uploading.value = true
-  const total = files.length
+  const total = fileList.length
   uploadProgress.value = { current: 0, total }
   let failCount = 0
 
-  const fileList = Array.from(files)
   for (let i = 0; i < fileList.length; i += 3) {
     const batch = fileList.slice(i, i + 3)
     await Promise.allSettled(batch.map(async (file) => {

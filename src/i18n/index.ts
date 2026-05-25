@@ -1685,6 +1685,7 @@ const messages = {
           renameFailed: '重命名失败：{message}',
           uploadFailed: '上传失败：{message}',
           uploadPartialFailed: '上传部分失败（{fail}/{total}）',
+          fileTooLarge: '已跳过 {count} 个超过 {max} 的文件',
         },
       },
       mediaPicker: {
@@ -5043,6 +5044,7 @@ const messages = {
           renameFailed: '重新命名失敗：{message}',
           uploadFailed: '上傳失敗：{message}',
           uploadPartialFailed: '上傳部分失敗（{fail}/{total}）',
+          fileTooLarge: '已略過 {count} 個超過 {max} 的檔案',
         },
       },
       mediaPicker: {
@@ -8401,6 +8403,7 @@ const messages = {
           renameFailed: 'Rename failed: {message}',
           uploadFailed: 'Upload failed: {message}',
           uploadPartialFailed: 'Upload partially failed ({fail}/{total})',
+          fileTooLarge: 'Skipped {count} file(s) larger than {max}',
         },
       },
       mediaPicker: {
