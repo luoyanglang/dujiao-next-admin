@@ -111,6 +111,16 @@ const formatPrice = (amount: number | string, currency: string) => {
   return formatMoney(amount, currency)
 }
 
+const formatWholesaleSummary = (product: AdminProduct) => {
+  const tiers = Array.isArray(product.wholesale_prices) ? product.wholesale_prices : []
+  if (!tiers.length) return ''
+  return tiers
+    .slice()
+    .sort((a, b) => Number(a.min_quantity || 0) - Number(b.min_quantity || 0))
+    .map((tier) => `≥${Number(tier.min_quantity || 0)} ${formatPrice(tier.unit_price, siteCurrency.value)}`)
+    .join(' / ')
+}
+
 const toSafeInt = (value: unknown) => {
   const num = Number(value)
   if (!Number.isFinite(num)) return 0
@@ -558,7 +568,12 @@ watch(
                 </div>
               </div>
             </TableCell>
-            <TableCell class="px-6 py-4 font-mono text-foreground">{{ formatPrice(product.price_amount, siteCurrency) }}</TableCell>
+            <TableCell class="px-6 py-4">
+              <div class="font-mono text-foreground">{{ formatPrice(product.price_amount, siteCurrency) }}</div>
+              <div v-if="formatWholesaleSummary(product)" class="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                {{ formatWholesaleSummary(product) }}
+              </div>
+            </TableCell>
             <TableCell class="px-6 py-4 min-w-[220px]">
               <div v-if="editingCategoryId === product.id" class="min-w-[140px]">
                 <Select
