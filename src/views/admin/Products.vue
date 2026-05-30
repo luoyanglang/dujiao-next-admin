@@ -63,14 +63,41 @@ const toggleSelect = (id: number) => {
   selectedIds.value = next
 }
 
+type BatchFailureItem = {
+  id?: number
+  error_code?: string
+  message?: string
+}
+
+const getBatchFailureMessage = (item?: BatchFailureItem) => {
+  if (item?.error_code === 'product_category_invalid') return t('admin.products.batch.failureCategoryInvalid')
+  if (item?.error_code === 'product_not_found') return t('admin.products.batch.failureProductNotFound')
+  return item?.message || t('admin.products.batch.failureUnknown')
+}
+
+const formatBatchStatusFailure = (failedItems: BatchFailureItem[], total: number, success: number) => {
+  const failed = failedItems.length || Math.max(total - success, 0)
+  const reason = getBatchFailureMessage(failedItems[0])
+  if (success === 0) {
+    return t('admin.products.batch.statusFailed', { failed, total, reason })
+  }
+  return t('admin.products.batch.statusPartial', { success, total, failed, reason })
+}
+
 const handleBatchStatus = async (isActive: boolean) => {
   const ids = Array.from(selectedIds.value)
   if (!ids.length) return
   batchOperating.value = true
   try {
     const res = await adminAPI.batchUpdateProductStatus(ids, isActive)
-    const data = res.data.data as { success_count?: number } | null
-    notifySuccess(t('admin.products.batch.statusResult', { success: data?.success_count || 0, total: ids.length }))
+    const data = res.data.data as { success_count?: number; failed_items?: BatchFailureItem[] } | null
+    const success = data?.success_count || 0
+    const failedItems = Array.isArray(data?.failed_items) ? data.failed_items : []
+    if (failedItems.length > 0 || success < ids.length) {
+      notifyError(formatBatchStatusFailure(failedItems, ids.length, success))
+    } else {
+      notifySuccess(t('admin.products.batch.statusResult', { success, total: ids.length }))
+    }
     selectedIds.value = new Set()
     fetchProducts()
   } catch (err: any) { notifyError(err?.response?.data?.message || err?.message) } finally { batchOperating.value = false }
